@@ -1,0 +1,42 @@
+
+
+// Function to be put in source file
+
+pair<Mat, Mat>  splitImage(const Mat& OGimage) {
+	int width = OGimage.cols; //width of image
+	int height = OGimage.rows; // hight of image
+
+	int n = height / 2;
+	int maxn;
+	Mat splitImg1(n, width, OGimage.type());  // creates empty image with half height and full width of original image.
+	Mat splitImg2(n, width, OGimage.type());  // The new images are the same type as the original
+	
+	for (int i = 0; i < n; i++) {
+
+		OGimage.row(i * 2).copyTo(splitImg1.row(i));      // Copy even rows to splitImg1 in a safe way
+		OGimage.row(i * 2 + 1).copyTo(splitImg2.row(i));  // Copy odd rows to splitImg2
+
+
+		/*
+		splitImg1.row(i) = OGimage.row(i * 2);			// simpler way to copy pixels, though dangerous as
+		splitImg2.row(i) = OGimage.row(i * 2 + 1);		// the Mat structures will share memory with the original this way (a seperate copy is not actualy created/shallow copy)
+		*/
+
+		maxn = i * 2 + 1;
+	}
+	cout << "maxn = " << maxn << "\n";
+
+	return make_pair(splitImg1, splitImg2);
+
+}
+
+
+
+
+// code to be implemented in main
+
+pair<Mat, Mat> splitImgs = splitImage(image1);
+
+imshow("First Half", splitImgs.first);
+imshow("Second Half", splitImgs.second);
+waitKey();
