@@ -1,5 +1,10 @@
 
 
+// special dependencies
+
+#include <utility>  // For std::pair
+
+
 // Function to be put in source file
 
 pair<Mat, Mat>  splitImage(const Mat& OGimage) {
@@ -10,6 +15,7 @@ pair<Mat, Mat>  splitImage(const Mat& OGimage) {
 	int maxn;
 	Mat splitImg1(n, width, OGimage.type());  // creates empty image with half height and full width of original image.
 	Mat splitImg2(n, width, OGimage.type());  // The new images are the same type as the original
+	// creating empty Mat structures  with specified sizes are more efficient than ones with unspecified dimensions
 	
 	for (int i = 0; i < n; i++) {
 
@@ -40,3 +46,5 @@ pair<Mat, Mat> splitImgs = splitImage(image1);
 imshow("First Half", splitImgs.first);
 imshow("Second Half", splitImgs.second);
 waitKey();
+
+
