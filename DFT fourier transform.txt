@@ -1,0 +1,111 @@
+
+// special dependencies
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
+
+
+
+
+// To be inserted into the source file:
+
+void fourier(const Mat& OGImage) {
+
+
+	int rows = OGImage.rows;
+	int cols = OGImage.cols;
+	
+	cout << "Rows = " << rows << "  cols = " << cols << "\n";
+
+	// First we need to resize the image so dimensions are optimal for DFT transform.
+	// This is done by adding aditional columns/rows of zero's along the edges
+
+	Mat paddedImage;
+
+	int desiredRows = getOptimalDFTSize(OGImage.rows);
+	int desiredCols = getOptimalDFTSize(OGImage.cols);
+
+	cout << "Desired rows = " << desiredRows << "  cols = " << desiredCols << "\n";
+
+	Mat zeroRow = Mat::zeros(desiredRows - rows, cols, OGImage.type());
+	vconcat(OGImage, zeroRow, paddedImage);
+	Mat zeroCol = Mat::zeros(paddedImage.rows, desiredCols-cols, OGImage.type());
+	hconcat(paddedImage, zeroCol, paddedImage); 
+
+
+	//imshow("padded image", paddedImage);
+	//waitKey();
+
+	cout << "New rows = " << paddedImage.rows << "  new Cols = " << paddedImage.cols << "\n";
+	
+	
+	// Now we will create the complex matrix which will contain the DFT output
+
+	Mat real = Mat_<float>(paddedImage);
+	Mat imaginary = Mat::zeros(paddedImage.size(),CV_32F); 
+	// the output of the dft is a floating point value, so the two matrices are defined as float
+
+	Mat channels[] = { real, imaginary };
+
+	Mat complexImage; 
+	merge(channels, 2, complexImage);
+
+
+	// Doing the DFT !!! :-)
+	
+	dft(complexImage, complexImage, DFT_COMPLEX_OUTPUT);
+
+
+	// finding the magnitude as sqrt(R^2 + I^2) for each element in the complex output
+	split(complexImage, channels);
+	Mat mag;
+	magnitude(channels[0], channels[1], mag);
+
+
+	double minVal, maxVal;
+	minMaxLoc(mag, &minVal, &maxVal);
+	cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
+
+	if (minVal == 0) {
+		mag += 1; // avoid accidentally deviding by zero when taking the natural logarithm
+	}
+
+	log(mag, mag);
+	minMaxLoc(mag, &minVal, &maxVal);
+	cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
+
+	normalize(mag, mag, 0, 1, cv::NORM_MINMAX);
+	minMaxLoc(mag, &minVal, &maxVal);
+	cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
+
+
+	// to make sure the coordinates (0,0) is at the centre of the image, the first quadrant is swapped with the third, an´d the second with the fourth
+
+
+	mag = mag(Rect(0, 0, mag.cols & -2, mag.rows & -2)); // reduces the magnitude image to an even number of columns and rows
+
+	int xCenter = mag.cols / 2;
+	int yCenter = mag.rows / 2;
+
+	Mat firstQuard(mag, Rect(xCenter, 0, xCenter, yCenter)); 
+	Mat secondQuard(mag, Rect(0, 0, xCenter, yCenter)); 
+	Mat thirdQuard(mag, Rect(0, yCenter, xCenter, yCenter)); 
+	Mat fourthQuard(mag, Rect(xCenter, yCenter, xCenter, yCenter)); 
+	
+	Mat Temp;
+
+	//swap first and third quadrant
+	firstQuard.copyTo(Temp);
+	thirdQuard.copyTo(firstQuard);
+	Temp.copyTo(thirdQuard);
+
+	//swap second and third quadrant
+	secondQuard.copyTo(Temp);
+	fourthQuard.copyTo(secondQuard);
+	Temp.copyTo(fourthQuard);
+
+	imshow("fourier image", mag); 
+	waitKey();
+
+}
+
