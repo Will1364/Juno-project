@@ -1,3 +1,5 @@
+// this code is made with inspiration from https://insightfultscript.com/collections/programming/cpp/opencv-fourier-transform-cpp/
+
 
 // special dependencies
 #include <opencv2/highgui.hpp>
@@ -74,7 +76,8 @@ void fourier(const Mat& OGImage) {
 	minMaxLoc(mag, &minVal, &maxVal);
 	cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
 
-	normalize(mag, mag, 0, 1, cv::NORM_MINMAX);
+	// values in floating images needs to be between 0-1 so we need to normalize
+	normalize(mag, mag, 0, 1, cv::NORM_MINMAX); 
 	minMaxLoc(mag, &minVal, &maxVal);
 	cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
 
