@@ -11,7 +11,7 @@
 
 // To be inserted into the source file:
 
-void fourier(const Mat& OGImage) {
+Mat fourier(const Mat& OGImage) {
 
 
 	int rows = OGImage.rows;
@@ -20,7 +20,8 @@ void fourier(const Mat& OGImage) {
 	cout << "Rows = " << rows << "  cols = " << cols << "\n";
 
 	// First we need to resize the image so dimensions are optimal for DFT transform.
-	// This is done by adding aditional columns/rows of zero's along the edges
+	// This is done by adding aditional columns/rows of zero's along the edges (see equation 4-98 & 4-99 on page 256)
+
 
 	Mat paddedImage;
 
@@ -110,5 +111,23 @@ void fourier(const Mat& OGImage) {
 	imshow("fourier image", mag); 
 	waitKey();
 
+
+
+	// at last we can convert back to the reconstructed image:
+
+	Mat recImage;
+	
+	idft(complexImage, complexImage, DFT_SCALE | DFT_REAL_OUTPUT); 
+	
+	normalize(complexImage, recImage, 0, 1, NORM_MINMAX); 
+	
+	recImage = recImage.colRange(0, cols);
+	recImage = recImage.rowRange(0, rows);
+	
+	
+	imshow("Reconstructed Image (IDFT)", recImage);
+	waitKey(); 
+	
+	return recImage;
 }
 
