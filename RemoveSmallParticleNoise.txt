@@ -1,0 +1,132 @@
+
+//dependencies
+
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/core.hpp>
+#include <stdio.h>
+#include <math.h>
+#include <vector>
+#include <algorithm>
+
+
+// to be included in source file
+
+Mat RemoveSmallParticleNoise(Mat image) {
+	
+	//Make a copy of the existing image to compare to the original
+	Mat image2 = image.clone();
+	copyMakeBorder(image2, image2, 2, 2, 1, 1, BORDER_CONSTANT, Scalar(0, 0, 0));
+
+	//Set some threshold values
+	int t1 = 60; //Sets the difference between a pixel and its imidiate neighbour 
+	int t2 = 10; //Sets the difference between the 2 neighbours of a pixel
+
+	int width = image2.cols;
+	int height = image2.rows;
+
+	//The loop runs through every pixel in the image and compares different scenarios for noise
+	//For each scenario there is a sub-scenario for being at the edge of the image
+	//If the conditions are met, the particle is assigned the value of the average of the surrounding pixels
+	//Since a lot of the noise is made of streched lines rather than single pixels it is prefered to compare the pixels values to only some of the surrounding 8 pixels rather than all of them
+	//It is still compared to enough neighbours to make sure the stars are not removed
+	for (int i = 2; i < height - 2; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			//A separate scenario is made for noise followed by a dark echo - here both pixels should be considered simultaneously and both pixels are assigned the value of the average of the surrounding 7 pixels
+			if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) >= t2)) {
+				if (i == 2) {
+					if (j == 1) { image2.at<uchar>(i, j) = (image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1)) / 2; }
+					else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1)) / 4;
+
+					image2.at<uchar>(i, j + 1) = image2.at<uchar>(i, j);
+				}
+				if (i == height - 2) {
+					if (j == 1) { image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i - 2, j + 1)) / 2; }
+					else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i - 2, j + 1)) / 4;
+
+					image2.at<uchar>(i, j + 1) = image2.at<uchar>(i, j);
+				}
+				else {
+					if (j == 1) { image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1)) / 4; }
+					else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i-2, j + 1) + image2.at<uchar>(i - 2,j))/ 3;// + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i + 2, j - 1)) / 7;
+
+					image2.at<uchar>(i, j + 1) = image2.at<uchar>(i, j);
+				}
+			}
+
+			if (i == 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i, j + 1) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1)) / 3;
+				}
+				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i + 2, j)) / 3;
+			}
+			else if (i == height - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i, j + 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i - 2, j + 1)) / 3;
+				}
+				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i - 2, j)) / 3;
+			}
+			else if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
+				}
+				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j)) / 5;
+			}
+
+			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i + 2, j + 2) + image2.at<uchar>(i, j + 2) + image2.at<uchar>(i - 2, j)) / 3;
+				}
+				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i + 2, j + 2) + image2.at<uchar>(i, j + 2) + image2.at<uchar>(i - 2, j)) / 4;
+			}
+			else if (j<=width-2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j + 1) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i - 2, j + 1)) / 5;
+			}
+
+			else if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 1) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2))) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i, j + 1));
+				}
+				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i, j + 1) / 2);
+			}
+			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 2) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i-2,j-1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2))) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i, j + 2));
+				}
+				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i, j + 2) / 2);
+			}
+			
+			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i-2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+				if (j == 1) {
+					image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
+				}
+				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1)) / 4;
+			}
+
+		}
+	}
+
+	image2 = image2.rowRange(2, image2.rows - 2).colRange(1, image2.cols - 1);
+	
+	Mat ImDif;
+	absdiff(image, image2, ImDif);
+
+	threshold(ImDif, ImDif, 2, 255, THRESH_BINARY);
+
+	namedWindow("Dif", WINDOW_NORMAL);
+	resizeWindow("Dif", image2.rows * 2, image2.cols * 2);
+	imshow("Dif", ImDif);
+	waitKey(0);
+
+
+	namedWindow("New image", WINDOW_NORMAL);
+	resizeWindow("New image", image2.rows * 2, image2.cols * 2);
+	imshow("New image", image2);
+	waitKey(0);
+
+
+	return image2;
+}
