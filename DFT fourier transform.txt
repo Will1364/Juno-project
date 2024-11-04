@@ -111,6 +111,36 @@ Mat fourier(const Mat& OGImage) {
 	imshow("fourier image", mag); 
 	waitKey();
 
+	// now a graph of the x-axis is created so the oscilation frequency is more easily recognized
+
+	Mat xAxis = mag.row(yCenter);
+	minMaxLoc(xAxis, &minVal, &maxVal);
+	xAxis = (xAxis / maxVal)*500; // Normalize and rescale to fit window
+	
+	int length = xAxis.cols;
+	Mat graph(500, length, CV_8UC3, Scalar(255, 255, 255));
+	
+	float value;
+	int roundedValue;
+	int thickness = 1;     //line thickness is defined
+	for (int i = 0; i < length-1; i++) {               // a line is drawn for each value/element in the graph
+	
+		value = xAxis.at<float>(0, i);
+		roundedValue = static_cast<int>(round(value));
+		Point p1(i , 500 - roundedValue);             // the two points are defined
+	
+		value = xAxis.at<float>(0, i + 1);
+		roundedValue = static_cast<int>(round(value));
+		Point p2((i + 1), 500 - roundedValue);
+	
+		line(graph, p1, p2, Scalar(0, 0, 0),               //here the actual line is drawn
+			thickness, LINE_8);
+	}
+	
+	
+	namedWindow("graph", WINDOW_AUTOSIZE);
+	imshow("graph",graph); 
+	waitKey(); 
 
 
 	// at last we can convert back to the reconstructed image:
