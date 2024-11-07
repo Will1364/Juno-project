@@ -13,6 +13,10 @@
 
 Mat fourier(const Mat& OGImage) {
 
+	int mode = 0; 
+	// 0 for just setting oscillation frequency to 0 
+	// 1 for averaging filter (does not currently work)
+	// 2 for gaussian (has not been made yet)
 
 	int rows = OGImage.rows;
 	int cols = OGImage.cols;
@@ -97,7 +101,7 @@ Mat fourier(const Mat& OGImage) {
 
 	// now a graph of the x-axis is created so the oscilation frequency is more easily recognized
 
-	Mat xAxis = mag.row(yCenter);
+	Mat xAxis = mag.row(yCenter).clone();  //deep copy
 	minMaxLoc(xAxis, &minVal, &maxVal);
 	xAxis = (xAxis / maxVal)*500; // Normalize and rescale to fit window
 	
@@ -125,6 +129,83 @@ Mat fourier(const Mat& OGImage) {
 	namedWindow("graph", WINDOW_AUTOSIZE);
 	imshow("graph",graph); 
 	waitKey(); 
+
+	// the central peak is taken out of the profile to remove the DC contribution
+	for (int i = 0; i < 40; i++) {				
+		xAxis.at<float>(0, xCenter + i) = 0;
+		xAxis.at<float>(0, xCenter - i) = 0;
+	}
+	
+	Point minLoc;
+	Point maxLoc;
+	minMaxLoc(xAxis, &minVal, &maxVal, &minLoc, &maxLoc); // the largest oscillation is located
+	
+	cout << maxLoc.x << "\n";
+	int diff = xCenter - maxLoc.x;
+	
+	int interval = 20; // half the interval width to be removed is defined
+	
+	
+	mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0 
+	mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
+	
+	imshow("filterd fourier image", mag);
+	waitKey();
+	
+	complexImage = swapQuadrants(complexImage); 
+	
+	// now we can filter out the target oscillation according to the mode selected
+	
+	if (mode == 0) {
+		complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0
+		complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
+		complexImage = swapQuadrants(complexImage);
+	} else if(mode == 1) {
+	
+		Mat subMatrix;
+		Mat fComplexImage;
+		fComplexImage = complexImage.clone();   //deep copy
+	
+		for (int i = 0;i < 2;i++) {
+			for (int j = 0; j < 20; j++) {
+	
+	
+				// + diff
+				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter + diff + i - 5, xCenter + diff + i + 6));
+				fComplexImage.at<float>(yCenter + j, xCenter + diff + i) = sum(subMatrix)[0] * (1.0 / 11);
+				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter + diff - i - 5, xCenter + diff - i + 6));
+				fComplexImage.at<float>(yCenter + j, xCenter + diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+	
+	
+				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter + diff + i - 5, xCenter + diff + i + 6));
+				fComplexImage.at<float>(yCenter - j, xCenter + diff + i) = sum(subMatrix)[0] * (1.0 / 11);
+				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter + diff - i - 5, xCenter + diff - i + 6));
+				fComplexImage.at<float>(yCenter - j, xCenter + diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+	
+	
+	
+				// - diff
+				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter - diff + i - 5, xCenter - diff + i + 6));
+				fComplexImage.at<float>(yCenter + j, xCenter - diff + i) = sum(subMatrix)[0] * (1.0 / 11);
+				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter - diff - i - 5, xCenter - diff - i + 6));
+				fComplexImage.at<float>(yCenter + j, xCenter - diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+	
+	
+				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter - diff + i - 5, xCenter - diff + i + 6));
+				fComplexImage.at<float>(yCenter - j, xCenter - diff + i) = sum(subMatrix)[0] * (1.0 / 11);
+				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter - diff - i - 5, xCenter - diff - i + 6));
+				fComplexImage.at<float>(yCenter - j, xCenter - diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+	
+				complexImage = swapQuadrants(fComplexImage);
+	
+	
+	
+			}
+		}
+	}
+	
+	
+
 
 
 	// at last we can convert back to the reconstructed image:
