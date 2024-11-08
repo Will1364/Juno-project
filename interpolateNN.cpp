@@ -1,6 +1,6 @@
 //
 // Interpolation finding N nearest neighbours set by arr_size 
-// Input: Ouput of imShiftCoord function ( image with [x,y,val] channels )
+// Input: Ouput of imShiftCoord function ( image with [x,y,val] channels, see function bellow )
 // Output: Grayscale image
 // 
 
@@ -75,7 +75,6 @@ Mat interpolateNearestN(Mat img) {
 								min_j[m] = s_x + l;
 
 								break;
-
 							}
 						}
 					}
@@ -85,7 +84,6 @@ Mat interpolateNearestN(Mat img) {
 			if (min_i[0] % 2 == 0) {
 				used += 1;
 			}
-
 
 			if (min_d[0] < 1) {
 				 
@@ -105,10 +103,77 @@ Mat interpolateNearestN(Mat img) {
 		}
 	}
 
+	// Show image with the values used in interpolation
 	//namedWindow("Image intp shift vals used", WINDOW_AUTOSIZE);
 	//imshow("Image intp shift vals used", vals_used);
 	//imwrite("img_intp_used.png", vals_used);
 
 	cout << "\rinterpolated    " << endl << "fraction used from each segment: " << float(used) / (height_i * width_i) << endl << endl;
 	return interpolated;
+}
+
+
+//
+// imShiftCoord function
+// Rotates image based on rot_prm (x, y, theta), and saves the rotated coordinates
+// Input: Interlaced image and rotation parameters (as outputted from LSQ function) 
+// Output: Matrix with [x, y, val] channels 
+// For use with interpolation function
+Mat imShiftCoord(Mat img, array<float, 3> rot_prm) {
+	// Creates a Mat object with [x,y,val] (insted of RGB) 
+	// Same math as is imShiftSimple, but rotates each part of the image at half the angle 
+
+	double angle = rot_prm[2];   
+	angle = angle / 2;
+
+	float x0 = rot_prm[0];							
+	float y0 = rot_prm[1];
+
+	int width = img.cols;					// Parameter setup
+	int height = img.rows;
+
+	double x_coord = 0;
+	double y_coord = 0;
+
+	int x_shift = 0;
+	int y_shift = 0;
+
+	Mat img_shift(height, width, CV_64FC3);
+
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+
+			
+			if (i % 2 == 1) {
+
+				x_coord = ((j - x0) * cos(angle) - (i - y0) * sin(angle)) + x0;
+				x_shift = x_coord;
+
+				y_coord = ((j - x0) * sin(angle) + (i - y0) * cos(angle)) + y0;
+				y_shift = y_coord + (1 - int(y_coord) % 2);
+
+				img_shift.at<Vec3d>(i, j)[0] = x_coord;
+				img_shift.at<Vec3d>(i, j)[1] = y_coord;
+				
+				img_shift.at<Vec3d>(i, j)[2] = img.at<uchar>(i, j);
+				
+			}
+
+			else if (i % 2 == 0) {
+
+				x_coord = ((j - x0) * cos(angle) + (i - y0) * sin(angle)) + x0;
+				x_shift = x_coord;
+
+				y_coord = (-(j - x0) * sin(angle) + (i - y0) * cos(angle)) + y0;
+				y_shift = y_coord + int(y_coord) % 2;
+
+				img_shift.at<Vec3d>(i, j)[0] = x_coord;
+				img_shift.at<Vec3d>(i, j)[1] = y_coord;
+
+				img_shift.at<Vec3d>(i, j)[2] = img.at<uchar>(i, j);
+			}
+		}
+	}
+
+	return img_shift;
 }
