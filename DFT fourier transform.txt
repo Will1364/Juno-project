@@ -15,7 +15,6 @@ Mat fourier(const Mat& OGImage) {
 
 	int mode = 0; 
 	// 0 for just setting oscillation frequency to 0 
-	// 1 for averaging filter (does not currently work)
 	// 2 for gaussian (has not been made yet)
 
 	int rows = OGImage.rows;
@@ -160,50 +159,119 @@ Mat fourier(const Mat& OGImage) {
 		complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0
 		complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
 		complexImage = swapQuadrants(complexImage);
-	} else if(mode == 1) {
+		
+		mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0 
+		mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
 	
-		Mat subMatrix;
-		Mat fComplexImage;
-		fComplexImage = complexImage.clone();   //deep copy
+		imshow("filterd fourier image", mag);
+		waitKey();
 	
-		for (int i = 0;i < 2;i++) {
-			for (int j = 0; j < 20; j++) {
+	}
+	else if (mode == 1) {
 	
-	
-				// + diff
-				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter + diff + i - 5, xCenter + diff + i + 6));
-				fComplexImage.at<float>(yCenter + j, xCenter + diff + i) = sum(subMatrix)[0] * (1.0 / 11);
-				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter + diff - i - 5, xCenter + diff - i + 6));
-				fComplexImage.at<float>(yCenter + j, xCenter + diff - i) = sum(subMatrix)[0] * (1.0 / 11);
-	
-	
-				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter + diff + i - 5, xCenter + diff + i + 6));
-				fComplexImage.at<float>(yCenter - j, xCenter + diff + i) = sum(subMatrix)[0] * (1.0 / 11);
-				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter + diff - i - 5, xCenter + diff - i + 6));
-				fComplexImage.at<float>(yCenter - j, xCenter + diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+		const int halfFilterWidth = 30;
+		const int cutoff =  10;
+		float halfGaussFilter[halfFilterWidth]; 
 	
 	
 	
-				// - diff
-				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter - diff + i - 5, xCenter - diff + i + 6));
-				fComplexImage.at<float>(yCenter + j, xCenter - diff + i) = sum(subMatrix)[0] * (1.0 / 11);
-				subMatrix = complexImage(Range(yCenter + j, yCenter + j), Range(xCenter - diff - i - 5, xCenter - diff - i + 6));
-				fComplexImage.at<float>(yCenter + j, xCenter - diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+		for (int i = 0;i < halfFilterWidth; i++) {
+			halfGaussFilter[i] = 1 - exp(-pow(i + 1, 2) / (2 * pow(cutoff, 2)));
+			cout << halfGaussFilter[i] << "\n";
+		}
+	
+		split(complexImage, channels);
+	
+		for (int i = 0; i < interval; i++) {
+	
+			mag.at<float>(yCenter + i, xCenter + diff) = 0;
+			mag.at<float>(yCenter - i, xCenter + diff) = 0;
+			mag.at<float>(yCenter + i, xCenter - diff) = 0;
+			mag.at<float>(yCenter - i, xCenter - diff) = 0;
 	
 	
-				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter - diff + i - 5, xCenter - diff + i + 6));
-				fComplexImage.at<float>(yCenter - j, xCenter - diff + i) = sum(subMatrix)[0] * (1.0 / 11);
-				subMatrix = complexImage(Range(yCenter - j, yCenter - j), Range(xCenter - diff - i - 5, xCenter - diff - i + 6));
-				fComplexImage.at<float>(yCenter - j, xCenter - diff - i) = sum(subMatrix)[0] * (1.0 / 11);
+			channels[0].at<float>(yCenter + i, xCenter + diff) = 0;
+			channels[0].at<float>(yCenter - i, xCenter + diff) = 0;
+			channels[0].at<float>(yCenter + i, xCenter - diff) = 0;
+			channels[0].at<float>(yCenter - i, xCenter - diff) = 0;
+			channels[1].at<float>(yCenter + i, xCenter + diff) = 0;
+			channels[1].at<float>(yCenter - i, xCenter + diff) = 0;
+			channels[1].at<float>(yCenter + i, xCenter - diff) = 0;
+			channels[1].at<float>(yCenter - i, xCenter - diff) = 0;
 	
-				complexImage = swapQuadrants(fComplexImage);
 	
+			for (int j = 0; j < halfFilterWidth; j++) {
+	
+				//cout << fcomplexImage.at<Vec2f>(yCenter - i, xCenter + diff + (j + 1)) * halfGaussFilter[j] << "\n";
+	
+	
+				channels[0].at<float>(yCenter - i, xCenter + diff + (j + 1)) *= halfGaussFilter[j];
+				channels[0].at<float>(yCenter - i, xCenter + diff - (j + 1)) *= halfGaussFilter[j];
+	
+				//second quadrant
+				channels[0].at<float>(yCenter - i, xCenter - diff + (j + 1)) *= halfGaussFilter[j];
+				channels[0].at<float>(yCenter - i, xCenter - diff - (j + 1)) *= halfGaussFilter[j];
+	
+				// third quadrant
+				channels[0].at<float>(yCenter + i, xCenter - diff + (j + 1)) *= halfGaussFilter[j];
+				channels[0].at<float>(yCenter + i, xCenter - diff - (j + 1)) *= halfGaussFilter[j];
+	
+				// fourth  quadrant
+				channels[0].at<float>(yCenter + i, xCenter + diff + (j + 1)) *= halfGaussFilter[j];
+				channels[0].at<float>(yCenter + i, xCenter + diff - (j + 1)) *= halfGaussFilter[j];
+	
+	
+				channels[1].at<float>(yCenter - i, xCenter + diff + (j + 1)) *= halfGaussFilter[j];
+				channels[1].at<float>(yCenter - i, xCenter + diff - (j + 1)) *= halfGaussFilter[j];
+	
+				//second quadrant
+				channels[1].at<float>(yCenter - i, xCenter - diff + (j + 1)) *= halfGaussFilter[j];
+				channels[1].at<float>(yCenter - i, xCenter - diff - (j + 1)) *= halfGaussFilter[j];
+				
+				// third quadrant
+				channels[1].at<float>(yCenter + i, xCenter - diff + (j + 1)) *= halfGaussFilter[j];
+				channels[1].at<float>(yCenter + i, xCenter - diff - (j + 1)) *= halfGaussFilter[j];
+	
+				// fourth  quadrant
+				channels[1].at<float>(yCenter + i, xCenter + diff + (j + 1)) *= halfGaussFilter[j];
+				channels[1].at<float>(yCenter + i, xCenter + diff - (j + 1)) *= halfGaussFilter[j];
+	
+	
+	
+	
+				mag.at<float>(yCenter - i, xCenter + diff + (j + 1)) = mag.at<float>(yCenter - i, xCenter + diff + (j + 1)) * halfGaussFilter[j];
+				mag.at<float>(yCenter - i, xCenter + diff - (j + 1)) = mag.at<float>(yCenter - i, xCenter + diff - (j + 1)) * halfGaussFilter[j];
+	
+				//second quadrant
+				mag.at<float>(yCenter - i, xCenter - diff + (j + 1)) = mag.at<float>(yCenter - i, xCenter - diff + (j + 1)) * halfGaussFilter[j];
+				mag.at<float>(yCenter - i, xCenter - diff - (j + 1)) = mag.at<float>(yCenter - i, xCenter - diff - (j + 1)) * halfGaussFilter[j];
+	
+				// third quadrant
+				mag.at<float>(yCenter + i, xCenter - diff + (j + 1)) = mag.at<float>(yCenter + i, xCenter - diff + (j + 1)) * halfGaussFilter[j];
+				mag.at<float>(yCenter + i, xCenter - diff - (j + 1)) = mag.at<float>(yCenter + i, xCenter - diff - (j + 1)) * halfGaussFilter[j];
+	
+				// fourth  quadrant
+				mag.at<float>(yCenter + i, xCenter + diff + (j + 1)) = mag.at<float>(yCenter + i, xCenter + diff + (j + 1)) * halfGaussFilter[j];
+				mag.at<float>(yCenter + i, xCenter + diff - (j + 1)) = mag.at<float>(yCenter + i, xCenter + diff - (j + 1)) * halfGaussFilter[j];
 	
 	
 			}
 		}
-	}
 	
+		merge(channels, 2, fcomplexImage);  
+	
+	
+	
+		cout << "her" << "\n"; 
+		imshow("filterd fourier image", mag); 
+		waitKey();
+	
+	
+		complexImage = swapQuadrants(fcomplexImage); 
+	
+	}
+		
+		
 	
 
 
