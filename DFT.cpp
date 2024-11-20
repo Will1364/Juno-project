@@ -18,8 +18,8 @@ Mat fourier(const Mat& OGImage) {
 	// 0 for just setting oscillation frequency to 0 
 	// 1 for gaussian 
 
-	string padding = "mirror";
-	// options for padding are "zeros", "clamp", "mirror"
+	string padding = "clamp";
+	// options for padding are: "zeros", "clamp", "mirror", "wrap"
 	
 	int analysis = 0; 
 	// if you want to see the magnitude profile and images set to 1
@@ -70,6 +70,9 @@ Mat fourier(const Mat& OGImage) {
 	}
 	else if (padding == "mirror") {
 		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_REFLECT101);
+	}
+	else if (padding == "wrap") {
+		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_WRAP);
 	}
 	else {
 		cout << "No valid padding is chosen" << "\n";
