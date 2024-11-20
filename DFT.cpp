@@ -34,8 +34,8 @@ Mat fourier(const Mat& OGImage) {
 	// half the interval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
 
 	
-	const int halfFilterWidth = 10;  // controls width of gaussian filter
-	const int cutoff =  3;		// controls agressiveness of gaussian filter
+	const int halfFilterWidth = 60;  // controls width of gaussian filter
+	const int cutoff =  20;		// controls agressiveness of gaussian filter
 	
 	// ------- program -----------------------------------------------------
 	
@@ -218,13 +218,14 @@ Mat fourier(const Mat& OGImage) {
 			complexImage = swapQuadrants(complexImage); 
 		}
 		else if (manual == true) {
-			for (int i = 0; i <= fList.size(); i++) {
+			for (int i = 0; i < fList.size(); i++) {
 				int diff = xCenter - fList[i];
-				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0   
-				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
-				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0    
-				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
+				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0   
+				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0; 
+				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0    
+				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0;  
 			}
+			complexImage = swapQuadrants(complexImage); 
 		}
 		imshow("filterd fourier image", mag);
 		waitKey();
