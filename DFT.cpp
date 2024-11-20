@@ -33,7 +33,9 @@ Mat fourier(const Mat& OGImage) {
 	int interval = 0; 
 	// half the interval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
 
-
+	
+	const int halfFilterWidth = 10;  // controls width of gaussian filter
+	const int cutoff =  3;		// controls agressiveness of gaussian filter
 	
 	// ------- program -----------------------------------------------------
 	
@@ -229,8 +231,6 @@ Mat fourier(const Mat& OGImage) {
 	
 	}
 	else if (mode == 1) {
-		const int halfFilterWidth = 30;
-		const int cutoff =  10;
 		float halfGaussFilter[halfFilterWidth]; 
 	
 	
