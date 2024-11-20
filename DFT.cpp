@@ -18,6 +18,9 @@ Mat fourier(const Mat& OGImage) {
 	// 0 for just setting oscillation frequency to 0 
 	// 1 for gaussian 
 
+	string padding = "mirror";
+	// options for padding are "zeros", "clamp", "mirror"
+	
 	int analysis = 0; 
 	// if you want to see the magnitude profile and images set to 1
 	
@@ -29,7 +32,8 @@ Mat fourier(const Mat& OGImage) {
 
 	int interval = 0; 
 	// half the interval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
-	
+
+
 	
 	// ------- program -----------------------------------------------------
 	
@@ -39,21 +43,40 @@ Mat fourier(const Mat& OGImage) {
 	//cout << "Rows = " << rows << "  cols = " << cols << "\n";
 
 	// First we need to resize the image so dimensions are optimal for DFT transform.
-	// This is done by adding aditional columns/rows of zero's along the edges (see equation 4-98 & 4-99 on page 256)
-
-
-	Mat paddedImage;
+	// This can be done by padding all the edges around the image. The padding type is chosen in the settings
+	
 
 	int desiredRows = getOptimalDFTSize(OGImage.rows);
 	int desiredCols = getOptimalDFTSize(OGImage.cols);
-
+	Mat paddedImage(desiredRows, desiredCols, OGImage.type());
+	
 	//cout << "Desired rows = " << desiredRows << "  cols = " << desiredCols << "\n";
 
-	Mat zeroRow = Mat::zeros(desiredRows - rows, cols, OGImage.type());
-	vconcat(OGImage, zeroRow, paddedImage);
-	Mat zeroCol = Mat::zeros(paddedImage.rows, desiredCols-cols, OGImage.type());
-	hconcat(paddedImage, zeroCol, paddedImage); 
+	int vBorder = (desiredRows - rows) / 2;
+	int hBorder = (desiredCols - cols) / 2;
+	
+	
+	if (padding == "clamp") {
+		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_REPLICATE); 
+	}
+	else if (padding == "zeros") {
+		Mat zeroRow = Mat::zeros(vBorder, cols, OGImage.type());
+		vconcat(OGImage, zeroRow, paddedImage);
+		vconcat(zeroRow, paddedImage, paddedImage);
+		Mat zeroCol = Mat::zeros(paddedImage.rows, hBorder, OGImage.type()); 
+		hconcat(paddedImage, zeroCol, paddedImage); 
+		hconcat(zeroCol, paddedImage, paddedImage); 
+	
+	}
+	else if (padding == "mirror") {
+		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_REFLECT101);
+	}
+	else {
+		cout << "No valid padding is chosen" << "\n";
+		waitKey(0);
+	}
 
+	
 
 	//imshow("padded image", paddedImage);
 	//waitKey();
@@ -381,8 +404,8 @@ Mat fourier(const Mat& OGImage) {
 	
 	normalize(complexImage, recImage, 0, 1, NORM_MINMAX); 
 	
-	recImage = recImage.colRange(0, cols);
-	recImage = recImage.rowRange(0, rows);
+	recImage = recImage.colRange(hBorder, cols + hBorder);
+	recImage = recImage.rowRange(vBorder, rows + vBorder);
 	
 	if (analysis == 1){
 		imshow("Reconstructed Image (IDFT)", recImage);
