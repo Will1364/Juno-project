@@ -10,7 +10,7 @@ parameters = coordinateLSQ(img);
 // Mat img_shift = imShiftSimple(img_nr, parameters);
 
 // Interpolation
-Mat img_coord = imShiftCoord(img_nr, parameters, true);
+Mat img_coord = imShiftCoord(img_nr, parameters);
 Mat img_intp = interpolateNN(img_coord, 8);
 // Mat img_intp = imread("intp_tmp.png", IMREAD_GRAYSCALE);
 imwrite("intp_tmp.png", img_intp);  // Save file for quick load when testing other functions 
