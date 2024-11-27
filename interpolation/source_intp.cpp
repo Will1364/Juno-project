@@ -12,6 +12,7 @@
 Mat interpolateNN(Mat img, int arr_size);
 
 // Interpolation cores
+double intpCoreNNPlus(vector<float> min_d, vector<float> min_v, int max_dist);
 double intpCoreDist(vector<float> min_d, vector<float> min_v);
 double intpCoreRadialBasis(int x_, int y_, vector<float> min_d, vector<int> min_i, vector<int> min_j, vector<float> min_v, Mat img);
 
@@ -37,7 +38,7 @@ Mat interpolateNN(Mat img, int arr_size) {
 	// Variables : 
 	int search = 50;		// NxN search area around each pixel. 50 is a good balance between compute time and extra buffer 
 	int padding = 0;		// Number of pixels to remove from the border. 
-	float max_dist = 1;		// The furthest away 'closest' pixel can be 
+	float max_dist = 2;		// The furthest away 'closest' pixel can be 
 	float min_dist = 0.05;  // If min distance is closer than this, uses uninterpolated value. Set to zero or negative to disable
 
 	// Parameter setup
@@ -70,6 +71,7 @@ Mat interpolateNN(Mat img, int arr_size) {
 	int used = 0;		// Counts used pixels from even rows
 	int unused = 0;		// Counts number of unused pixels
 	int progress = 1;	// Used to display progress
+	int count_mindist = 0;
 
 
 	// Interpolation function
@@ -127,15 +129,16 @@ Mat interpolateNN(Mat img, int arr_size) {
 				}
 			}
 
-			/*
+			
 			// Count to check that even and uneven rows from intput image are used roughly equally
 			if (min_i[0] % 2 == 0) {
 				used += 1;
 			}
-			*/
-
+			
+			// Uses uninterpolated value if pixel is closer than min_dist
 			if (min_d[0] < min_dist) {
 				interpolated.at<uchar>(i, j) = img.at<Vec3d>(min_i[0], min_j[0])[2];
+				count_mindist++;
 			}
 
 			else if (min_d[0] < max_dist) {
@@ -153,9 +156,10 @@ Mat interpolateNN(Mat img, int arr_size) {
 				// Radial basis interpolation: intpCoreRadialBasis(j, i, min_d, min_i, min_j, min_v, img), see function description
 				// 
 
-				//val = min_v[0];															// Nearest neighbour
+				// val = min_v[0];															// Nearest neighbour
+				// val = intpCoreNNPlus(min_d, min_v, max_dist);							// NN+; Takes average of all value within radius of max_dist (1, set in core).  					
 				val = intpCoreDist(min_d, min_v);										// Inverse distance weighting 
-				//val = intpCoreRadialBasis(j, i, min_d, min_i, min_j, min_v, img);		// Radial basis interpolation
+				// val = intpCoreRadialBasis(j, i, min_d, min_i, min_j, min_v, img);		// Radial basis interpolation
 
 
 				// Put value into interpolated image 
@@ -193,6 +197,8 @@ Mat interpolateNN(Mat img, int arr_size) {
 	cout << "\rinterpolated                       " << endl;
 	cout << "fraction used from each segment: " << float(used) / (height_i * width_i) << endl;
 	cout << "fraction unused: " << float(unused) / (height_i * width_i) << endl << endl;
+	cout << "Number of pixels closer than min_dist (" << min_dist << "): " << count_mindist << endl;
+	cout << endl;
 
 	return interpolated;
 }
@@ -202,15 +208,19 @@ double intpCoreDist(vector<float> min_d, vector<float> min_v) {
 	// Weights each value with 1/(d**p), d being distance to pixel, p being power 
 	// Larger p means pixel further away count less. 
 
+	// Variables
+	float max_dist = 10;	// Maximum distance for pixel to be allowed
+	float r0 = 0.2;			// Distance scaling, to prevet really small values
+	int p = 1.2;			// Power for distance weight. Closer to one -> distance matters less 
+
 	double W = 0;
 	double sumW = 0;		// Sum of weights, 1/(d**p)
 	double sumWu = 0;		// Sum of val * weights
-	int p = 4;
-
+	
 
 	for (int k = 0; k < min_d.size(); k++) {
-		if (min_d[k] < 1) {
-			W = 1 / pow(min_d[k], p);
+		if (min_d[k] < max_dist) {
+			W = 1 / pow(min_d[k]/r0, p);
 			sumW += W;
 			sumWu += min_v[k] * W;
 		}
@@ -229,7 +239,6 @@ double intpCoreRadialBasis(int x_, int y_, vector<float> min_d, vector<int> min_
 	// Inverse quadratic: 1/(1+(r/r0)**2)
 	// Thin plate spline: r**2 log(r / r0)     !Doesn't work
 	// 
-
 
 
 	// Variables: 
@@ -271,6 +280,7 @@ double intpCoreRadialBasis(int x_, int y_, vector<float> min_d, vector<int> min_
 	}
 
 	// If statements used to construct values since the function is a bit unstable. 
+	// This is probably due to the points being way too close when the lines 'cross' 
 	if (s > 0 and s < 256) {
 		return s;
 	}
@@ -278,4 +288,28 @@ double intpCoreRadialBasis(int x_, int y_, vector<float> min_d, vector<int> min_
 		return 255;
 	}
 	return 0;
+}
+
+double intpCoreNNPlus(vector<float> min_d, vector<float> min_v, int max_dist) {
+	// Extended Nearest neightbours: Takes average of all pixels within max_dist 
+	// For max_dist > 1, it acts as an averaging filter, consider using 
+	// inverse distance weighting (intpCoreDist) instead. 
+	// 
+
+	// Parameters
+	double val = 0;
+	int count = 0;
+	int size = min_d.size();
+	// max_dist = 1;	// Overwrite max_dist
+
+	// Loop through array, count and add up values for d < max_dist
+	for (int i = 0; i < size; i++) {
+		if (min_d[i] < max_dist) {
+			val += min_v[i];
+			count++;
+		}
+	}
+
+
+	return val/count;
 }
