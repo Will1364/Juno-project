@@ -19,9 +19,14 @@ Mat erodeLR(Mat img);
 Mat imShiftSimple(Mat img, array<float, 3> rot_prm);
 Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection = false);     // Creates a 3d array with [x,y,val] along the 3rd axis
 
+// Figures
+void intensityPlot(Mat img, int x_peak, int y_peak);
+
 // Other functions
 pair<Mat, Mat> blobCoordinates(Mat img);
+void blobFlux(Mat img, int threshold, int median);
 array<float, 3> coordinateLSQ(Mat img, bool lensCorrection = false);
+
 
 */
 // 
@@ -169,6 +174,7 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 
 		}
 	}
+	
 
 	// dilate back to make stars uniform 
 	img_tmp = dilateCross(img_tmp);
@@ -199,10 +205,12 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	int val = 0;
 
 	// Matrices to hold coordinates. Max set at 20 since it's probably way more than needed. 
-	Mat x_pos(20, 1, CV_32FC1);
-	Mat y_pos(20, 1, CV_32FC1); 
-
 	int count = 0;		// Used to count number of stars found
+	int count_max = 20; 
+	Mat x_pos(count_max, 1, CV_32FC1);
+	Mat y_pos(count_max, 1, CV_32FC1);
+
+	
 
 	// Scan through binary image 
 	for (int i = 1; i < height-1; i++) {
@@ -248,46 +256,58 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 						skip_left = false;
 
 						// Up
-						val = img_tmp.at<uchar>(y - 1, x);
-						if (direction == 0 and val == 255) {
+						if (y > 0) {
+							val = img_tmp.at<uchar>(y - 1, x);
+							if (direction == 0 and val == 255) {
 
-							// Update coordinate and direciton, then break
-							y = y - 1;
-							direction = 3;
-							skip_left = true;  // added so that it doesnt trigger left right away
-							//cout << "up" << endl;
-							break;
+								// Update coordinate and direciton, then break
+								y = y - 1;
+								direction = 3;
+								skip_left = true;  // added so that it doesnt trigger left right away
+								//cout << "up" << endl;
+								break;
+							}
 						}
+
 
 						// Right
-						val = img_tmp.at<uchar>(y, x + 1);
-						if (direction == 1 and val == 255) {
+						if (x < width - 1) {
+							val = img_tmp.at<uchar>(y, x + 1);
+							if (direction == 1 and val == 255) {
 
-							x = x + 1;
-							direction = 0;
-							//cout << "right" << endl;
-							break;
+								x = x + 1;
+								direction = 0;
+								//cout << "right" << endl;
+								break;
+							}
 						}
+
 
 						// Down
-						val = img_tmp.at<uchar>(y + 1, x);
-						if (direction == 2 and val == 255) {
+						if (y < height - 1) {
+							val = img_tmp.at<uchar>(y + 1, x);
+							if (direction == 2 and val == 255 and y < height) {
 
-							y = y + 1;
-							direction = 1;
-							//cout << "down" << endl;
-							break;
+								y = y + 1;
+								direction = 1;
+								//cout << "down" << endl;
+								break;
+							}
 						}
+
 
 						// Left
-						val = img_tmp.at<uchar>(y, x - 1);
-						if (direction == 3 and val == 255 and !skip_left) {
+						if (x > 0) {
+							val = img_tmp.at<uchar>(y, x - 1);
+							if (direction == 3 and val == 255 and !skip_left and x > 0) {
 
-							x = x - 1;
-							direction = 2;
-							//cout << "left" << endl;
-							break;
+								x = x - 1;
+								direction = 2;
+								//cout << "left" << endl;
+								break;
+							}
 						}
+
 
 						// Rotate start direction 90 degrees
 						direction = (direction + 1) % 4;
@@ -325,8 +345,8 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 					//cout << "" << int(x_pos.at<float>(count, 0)) << ", " << int(y_pos.at<float>(count, 0)) << ", area: " << area << endl;
 
 					count++;
-					if (count == 20) {
-						cout << "Too many stars, using first 20... " << endl;
+					if (count == count_max) {
+						cout << "Too many stars, using first " << count_max << "..." << endl;
 					}
 				}
 				
@@ -365,7 +385,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	// 
 
 	// Variables 
-	int threshold = 230;
+	int threshold = 40;
 
 	// Parameter setup
 	pair<Mat, Mat> img_binary = splitBinary(img, threshold); 
@@ -431,9 +451,9 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 	Mat G(2 * N, 3, CV_32FC1);
 
-	double m_theta = 1;
-	double m_x = 1;
-	double m_y = 1;
+	double m_theta = -1.5 * pi/180;
+	double m_x = 370;
+	double m_y = -240;
 
 	Mat m(3, 1, CV_32FC1);
 	m.at<float>(0, 0) = m_theta;
@@ -722,4 +742,504 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 
 	// Returns image with channels [x, y, z] 
 	return img_shift;
+}
+
+void blobFlux(Mat img, int threshold, int median) {
+	// Finds blobs (stars) and determines their center coordinate and area. Returns list of coordinates (x, y). 
+	// Does simple errosion/dilation to remove noise/combine stripes to full stars, 
+	// and 4-connectedness to determine position/area of stars. 
+	// Used in coordinateLSQ.
+	// 
+	// Can optionally print coordinates and area of each found blob. 
+	// 
+	// Change area conditions bellow if errors occour (or add more/less errosion and dilation) 
+	// 
+	// Input
+	// img:		Interpolated image
+	// 
+	// Output
+	// Prints coordinate, flux and area to console
+	//
+
+	// Paramter setup
+	Mat img_tmp = img > threshold;	// Binary image for blob analysis
+	
+	
+
+	int width = img.cols;		// Parameter setup
+	int height = img.rows;
+
+	// Remove speckles by erosion
+	img_tmp = erodeLR(img_tmp);
+	img_tmp = erodeLR(img_tmp);
+
+	
+	// Remove left side (since it is mostly noise)
+	/*
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < 30; j++) {
+
+			img_tmp.at<uchar>(i, j) = 0;
+
+		}
+	}
+	*/
+
+	// dilate back to make stars uniform, add extra padding
+	img_tmp = dilateCross(img_tmp);
+	img_tmp = dilateCross(img_tmp); 
+	img_tmp = dilateCross(img_tmp); 
+	img_tmp = dilateCross(img_tmp); 
+
+
+
+	Mat img_used; 
+	img_tmp.copyTo(img_used);
+
+	// More parameters
+	int border = 0;
+	int area = 0;
+
+	int x = 0;
+	int y = 0;
+
+	float x_sum = 0;
+	float y_sum = 0;
+
+	int x_min = 0;
+	int x_max = 0;
+
+	int y_min = 0;
+	int y_max = 0;
+
+	int x_0 = 0;		// Blob start coordinate for connectedness
+	int y_0 = 0;
+
+	int x_peak = 0;		// Find maxpoint in blob 
+	int y_peak = 0;
+	int val_peak = 0;
+
+	int direction = 0;
+	bool skip_left = false;
+
+	double flux = 0;
+
+	int val = 0;
+
+	// Scan through binary image 
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+
+			// Four connectedness when object is found:
+			if (img_tmp.at<uchar>(i, j) == 255) {
+
+				// Min/max x of the four connectedness, to cut out object afterwards
+				x_min = j;
+				x_max = j;
+
+				y_min = i;
+				y_max = i;
+
+				// Loop until back at start
+				while (!(x == j and y == i)) {
+					if (border == 0) {
+						x = j;
+						y = i;
+					}
+
+					border += 1;
+
+					// Check for min max values
+					if (x < x_min) {
+						x_min = x;
+					}
+					else if (x > x_max) {
+						x_max = x;
+					}
+					if (y < y_min) {
+						y_min = y;
+					}
+					else if (y > y_max) {
+						y_max = y;
+					}
+
+					// Find next pixel
+					// Directions: 0 -> up, 1 -> right, 2 -> down, 3 -> left
+					for (int k = 0; k < 4; k++) {
+
+						skip_left = false;
+
+						// Up
+						if (y > 0) {
+							val = img_tmp.at<uchar>(y - 1, x);
+							if (direction == 0 and val == 255) {
+
+								// Update coordinate and direciton, then break
+								y = y - 1;
+								direction = 3;
+								skip_left = true;  // added so that it doesnt trigger left right away
+								//cout << "up" << endl;
+								break;
+							}
+						}
+						
+
+						// Right
+						if (x < width - 1) {
+							val = img_tmp.at<uchar>(y, x + 1);
+							if (direction == 1 and val == 255) {
+
+								x = x + 1;
+								direction = 0;
+								//cout << "right" << endl;
+								break;
+							}
+						}
+						
+
+						// Down
+						if (y < height - 1) {
+							val = img_tmp.at<uchar>(y + 1, x);
+							if (direction == 2 and val == 255 and y < height) {
+
+								y = y + 1;
+								direction = 1;
+								//cout << "down" << endl;
+								break;
+							}
+						}
+						
+
+						// Left
+						if (x > 0) {
+							val = img_tmp.at<uchar>(y, x - 1);
+							if (direction == 3 and val == 255 and !skip_left and x > 0) {
+
+								x = x - 1;
+								direction = 2;
+								//cout << "left" << endl;
+								break;
+							}
+						}
+						
+
+						// Rotate start direction 90 degrees
+						direction = (direction + 1) % 4;
+
+					}
+
+				}
+
+				
+				// Calculate flux and area 
+				for (int k = y_min; k < y_max + 1; k++) {
+					for (int l = x_min; l < x_max + 1; l++) {
+
+						val = img.at<uchar>(k, l);
+						flux += img.at<uchar>(k, l) - median;
+
+						// Compute area and x_sum/y_sum for center value
+						if (val > 1 * median) {
+							// Add area
+							area += 1;
+							x_sum += l;
+							y_sum += k;
+
+							// img_used.at<uchar>(k, l) = 120;
+
+
+							if (val > val_peak) {
+								val_peak = val;
+								x_peak = l;
+								y_peak = k;
+							}
+						}
+
+						// img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
+
+					}
+
+				}
+
+
+				if (flux > 300 and area > 100) {
+					
+					cout << "flux: " << flux;
+					// cout << ", [x,y]: " << x_sum / area << ", " << y_sum / area;
+					cout << ", [x,y]: " << x_peak << ", " << y_peak;
+					cout << ", area: " << area;
+					cout << endl;
+				}
+				
+				// Remove blob from image
+				for (int k = y_min; k < y_max + 1; k++) {
+					for (int l = x_min; l < x_max + 1; l++) {
+
+						img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
+
+
+						if (flux > 300 and area > 100) {
+							val = img.at<uchar>(k, l);
+							if (val > median) {
+								img_used.at<uchar>(k, l) = 120;  // 
+							}
+						}
+
+					}
+
+				}
+
+				img_used.at<uchar>(y_peak, x_peak) = 170;
+
+				// Reset parameters
+				x_sum = 0;
+				y_sum = 0;
+
+				area = 0;
+				flux = 0;
+
+				border = 0;
+
+				val_peak = 0;
+
+			}
+
+		}
+	}
+	
+	namedWindow("Image flux vals used", WINDOW_AUTOSIZE);
+	imshow("Image flux vals used", img_used);
+
+	imwrite("img_flux_used.png", img_used);
+
+	cout << endl;
+	return void();
+
+}
+
+
+void intensityPlot(Mat img, int x_peak, int y_peak) {
+	// Plots the intensity in x and y direction for a specified point (x_peak, y_peak). 
+	// Restricts size to 
+	// 
+	
+	// Variables 
+	int height = 260;		// Size of plot
+	int width = 260 * 2;
+
+	int noiseFloor = 20;	// Noise floor -> used to determine 'end' of object 
+	int padding = 5;		// Number of points beneath noise floor before ending 
+	int max_dist = 20;		// Maximum  distance from peak (-> maximum 40 point wide figure)
+
+	// Parameters
+	Mat imgPlot(height, width, CV_8UC1);
+	imgPlot = 0;
+
+	int x_min = 0;
+	int y_min = 0;
+	int x_max = 0;
+	int y_max = 0;
+
+	int val = 0;
+	int tmp = 0;
+
+	// Drawing parameters
+	int pointWidth = 0;
+	int y0 = 0;
+	int y1 = 0;
+	Point pt1, pt2;
+
+	int arr_size_x = 0;
+	int arr_size_y = 0;
+	int arr_width = 0;
+
+	// Find x_min
+	for (int j = x_peak; tmp < padding + 1; j--) {
+		val = img.at<uchar>(y_peak, j);
+
+		if (val > noiseFloor and tmp > 0) {
+			tmp--;
+		}
+		else if (val < noiseFloor) {
+			tmp++;
+			if (tmp == padding) {
+				x_min = j;
+			}
+		}
+		if (j - x_peak > max_dist) {
+			x_min = j;
+			break;
+		}
+	}
+	tmp = 0;
+
+	// Find x_max 
+	for (int j = x_peak; tmp < padding + 1; j++) {
+		
+		val = img.at<uchar>(y_peak, j);
+		
+		if (val > noiseFloor and tmp > 0) {
+			tmp--;
+		}
+		else if (val < noiseFloor) {
+			tmp++;
+			if (tmp == padding) {
+				x_max = j;
+			}
+		}
+		if (j - x_peak > max_dist) {
+			x_max = j;
+			break;
+		}
+	}
+	tmp = 0;
+
+
+	// Find y_min
+	for (int i = y_peak; tmp < padding + 1; i--) {
+		val = img.at<uchar>(i, x_peak);
+
+		if (val > noiseFloor and tmp > 0) {
+			tmp--;
+		}
+		else if (val < noiseFloor) {
+			tmp++;
+			if (tmp == padding) {
+				y_min = i;
+			}
+		}
+		if (y_peak - i > max_dist) {
+			y_min = i;
+			break;
+		}
+	}
+	tmp = 0;
+
+	// Find y_max
+	for (int i = y_peak; tmp < padding + 1; i++) {
+		val = img.at<uchar>(i, x_peak);
+
+		if (val > noiseFloor and tmp > 0) {
+			tmp--;
+		}
+		else if (val < noiseFloor) {
+			tmp++;
+			if (tmp == padding) {
+				y_max = i;
+			}
+		}
+		if (i - y_peak > max_dist) {
+			y_max = i;
+			break;
+		}
+	}
+	tmp = 0;
+
+
+	arr_size_x = x_max - x_min + 1;
+	arr_size_y = y_max - y_min + 1;
+	arr_width = max(x_peak - x_min, y_peak - y_min) + max(x_max - x_peak, y_max - y_peak);	// Combined width 
+
+	vector<int> x_arr(arr_size_x, 0);
+	vector<int> y_arr(arr_size_y, 0);
+
+	// Fill x-array
+	for (int j = x_min; j <= x_max; j++) {
+		x_arr[j - x_min] = img.at<uchar>(y_peak, j);
+	}
+
+	// Fill y-array
+	for (int i = y_min; i <= y_max; i++) {
+		y_arr[i- y_min] = img.at<uchar>(i, x_peak);
+	}
+
+	// Width of points
+	pointWidth = (width) / arr_width;
+	
+	
+	// Draw x-grid 
+	for (int i = 0; i <= arr_width; i++) {
+		pt1 = Point2d((i) * pointWidth, 0);
+		pt2 = Point2d((i) * pointWidth, height);
+
+		line(imgPlot, pt1, pt2, 40);
+	}
+	// Line at peak position
+	tmp = max(x_peak - x_min, y_peak - y_min);
+	pt1 = Point2d((tmp)*pointWidth, 0);
+	pt2 = Point2d((tmp)*pointWidth, height);
+	line(imgPlot, pt1, pt2, 60);
+	
+
+
+
+
+	// Plot y-direction
+	tmp = max(x_peak - x_min, y_peak - y_min) - (y_peak - y_min);
+	for (int i= 0; i < arr_size_y; i++) {
+		if (i == 0) {
+			y0 = height;
+			y1 = height - y_arr[i];
+
+			pt1 = Point2d((i + tmp + 1) * pointWidth, y0);
+			pt2 = Point2d((i + tmp + 1) * pointWidth, y1);
+		}
+		else if (i == arr_size_y - 1) {
+			y0 = height;
+			y1 = height - y_arr[i];
+
+			pt1 = Point2d((i + tmp) * pointWidth, y0);
+			pt2 = Point2d((i + tmp) * pointWidth, y1);
+		}
+		else {
+			y0 = height - y_arr[i];
+			y1 = height - y_arr[i + 1];
+
+			pt1 = Point2d((i + tmp) * pointWidth, y0);
+			pt2 = Point2d((i + tmp + 1) * pointWidth, y1);
+		}
+
+		
+		line(imgPlot, pt1, pt2, 200);
+
+	}
+
+	// Plot x-direction
+	tmp = max(x_peak - x_min, y_peak - y_min) - (x_peak - x_min);
+	for (int j = 0; j < arr_size_x; j++) {
+		if (j == 0) {
+			y0 = height;
+			y1 = height - x_arr[j];
+
+			pt1 = Point2d((j + tmp + 1) * pointWidth, y0);
+			pt2 = Point2d((j + tmp + 1) * pointWidth, y1);
+		}
+		else if (j == arr_size_x - 1) {
+			y0 = height;
+			y1 = height - x_arr[j];
+
+			pt1 = Point2d((j + tmp) * pointWidth, y0);
+			pt2 = Point2d((j + tmp) * pointWidth, y1);
+		}
+		else {
+			y0 = height - x_arr[j];
+			y1 = height - x_arr[j + 1];
+
+			pt1 = Point2d((j + tmp) * pointWidth, y0);
+			pt2 = Point2d((j + tmp + 1) * pointWidth, y1);
+		}
+
+		
+
+		line(imgPlot, pt1, pt2, 100);
+
+	}
+
+
+	string windowName = "Intensity plot for object at [" + to_string(x_peak) + ", " + to_string(y_peak) + "]";
+	namedWindow(windowName, WINDOW_AUTOSIZE);
+	imshow(windowName, imgPlot);
+
+	return void();
+
 }
