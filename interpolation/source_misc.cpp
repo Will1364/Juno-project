@@ -40,7 +40,6 @@ pair<Mat, Mat> splitBinary(Mat img, int threshold) {
 	// Output: Pair with two binary images 
 	//
 
-
 	// Parameters
 	int width = img.cols;		
 	int height = img.rows;
@@ -154,6 +153,11 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	// Pair with two arrays of coordinates, x and y, for each star 
 	//
 
+	// Variables 
+	int area_min = 25;		// Minimum area for object to count
+	int area_max = 450;		// Maximum area
+	int count_max = 20;		// Maximum number of object to use 
+
 	// Paramter setup
 	Mat img_tmp;
 	img.copyTo(img_tmp);		// Temporary image for analysis
@@ -206,7 +210,7 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 
 	// Matrices to hold coordinates. Max set at 20 since it's probably way more than needed. 
 	int count = 0;		// Used to count number of stars found
-	int count_max = 20; 
+	
 	Mat x_pos(count_max, 1, CV_32FC1);
 	Mat y_pos(count_max, 1, CV_32FC1);
 
@@ -337,12 +341,12 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 				}
 
 				// Save coordinate if area of object is within conditions
-				if (area > 30 and area < 150 and count < 20) {
+				if (area > area_min and area < area_max and count < count_max) {
 
 					x_pos.at<float>(count, 0) = float(x_sum) / area;
 					y_pos.at<float>(count, 0) = float(y_sum) / area;
 
-					//cout << "" << int(x_pos.at<float>(count, 0)) << ", " << int(y_pos.at<float>(count, 0)) << ", area: " << area << endl;
+					// cout << "" << int(x_pos.at<float>(count, 0)) << ", " << int(y_pos.at<float>(count, 0)) << ", area: " << area << endl;
 
 					count++;
 					if (count == count_max) {
@@ -361,6 +365,7 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 		}
 	}
 
+	
 	// Return set of coordinates
 	return make_pair(x_pos, y_pos);
 }
@@ -386,6 +391,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 	// Variables 
 	int threshold = 40;
+	int dist_max = 30;		// Used to remove objects in only one image if different amount of objects are found
 
 	// Parameter setup
 	pair<Mat, Mat> img_binary = splitBinary(img, threshold); 
@@ -396,8 +402,15 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	//cout << endl << "Stars in second image: " << endl;
 	pair<Mat, Mat> coord_one = blobCoordinates(img_binary.second);
 
+	cout << endl; 
+
 	int N = 0;
 	int N2 = 0;
+
+	int tmp = 0;
+	float dist = 0;
+	float dist_min = 9999;
+	
 
 	array<float, 3> parameters = { 0, 0, 0 };
 	
@@ -428,12 +441,110 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 		N2++;
 	}
 
+	cout << "determining rotation paramters..." << endl; 
+	
+
 	if (N != N2) {
-		cout << "Error LSQ: different amount of objects found in binary images, returning empty array... " << endl; 
-		return parameters; 
+
+		// Loop through distance test twice 
+		// (In case there are more invalid coords in set two but, but still invalid coords in set 1)
+		for (int l = 0; l < 2; l++) {
+
+			// If more objects are found in first image: 
+			if (N > N2) {
+
+				// Remove corrdinates for objects with no nearby objects in other image
+				for (int i = 0; i < N; i++) {
+
+					dist_min = 9999;
+
+					for (int j = 0; j < N2; j++) {
+
+						// Determine closest coordinate set: 
+						dist = pow((coord_one.first.at<float>(i, 0) - coord_two.first.at<float>(j, 0)), 2) + pow((coord_one.second.at<float>(i, 0) - coord_two.second.at<float>(j, 0)), 2);
+						dist = sqrt(dist);
+
+						if (dist < dist_min) {
+							dist_min = dist;
+						}
+
+					}
+
+					if (dist_min > dist_max) {
+
+						for (int k = i; k < N + 1; k++) {
+							coord_one.first.at<float>(k, 0) = coord_one.first.at<float>(k + 1, 0);
+							coord_one.second.at<float>(k, 0) = coord_one.second.at<float>(k + 1, 0);
+						}
+
+					}
+
+				}
+
+				// Calculate number of valid coordinates again
+				N = 0;
+				for (int i = 0; i < coord_one.first.rows; i++) {
+					if (coord_one.first.at<float>(i, 0) < 0) {
+						break;
+					}
+					N++;
+				}
+
+
+			}
+
+
+			if (N2 > N) {
+				// Remove objects with no nearby object in other image
+				tmp = 0;
+				for (int i = 0; i < N; i++) {
+
+					dist_min = 9999;
+
+					for (int j = 0; j < N2; j++) {
+
+						// Determine closest coordinate set: 
+						dist = pow((coord_one.first.at<float>(j, 0) - coord_two.first.at<float>(i, 0)), 2) + pow((coord_one.second.at<float>(j, 0) - coord_two.second.at<float>(i, 0)), 2);
+						dist = sqrt(dist);
+
+						if (dist < dist_min) {
+							dist_min = dist;
+						}
+
+					}
+
+					if (dist_min > dist_max) {
+
+						for (int k = i; k < N + 1; k++) {
+							coord_two.first.at<float>(k, 0) = coord_two.first.at<float>(k + 1, 0);
+							coord_two.second.at<float>(k, 0) = coord_two.second.at<float>(k + 1, 0);
+						}
+
+					}
+
+				}
+
+				// Calculate number of valid coordinates again
+				N2 = 0;
+				for (int i = 0; i < coord_two.first.rows; i++) {
+					if (coord_two.first.at<float>(i, 0) < 0) {
+						break;
+					}
+					N2++;
+				}
+
+
+			}
+		}
+
+		if (N != N2) {
+			cout << "Error LSQ: different amount of objects found in binary images, returning empty array... " << endl;
+			return parameters;
+		}
+		
 	}
 
-	cout << "objects found:  " << N << endl;
+	cout << "valid objects found:  " << N << endl;
 
 	// Initialize variable: 
 	Mat x1(N, 1, CV_32FC1);
@@ -761,11 +872,13 @@ void blobFlux(Mat img, int threshold, int median) {
 	// Prints coordinate, flux and area to console
 	//
 
+	// Variables
+	int min_flux = 300;
+	int min_area = 100;
+
 	// Paramter setup
 	Mat img_tmp = img > threshold;	// Binary image for blob analysis
 	
-	
-
 	int width = img.cols;		// Parameter setup
 	int height = img.rows;
 
@@ -962,7 +1075,7 @@ void blobFlux(Mat img, int threshold, int median) {
 				}
 
 
-				if (flux > 300 and area > 100) {
+				if (flux > min_flux and area > min_area) {
 					
 					cout << "flux: " << flux;
 					// cout << ", [x,y]: " << x_sum / area << ", " << y_sum / area;
@@ -978,7 +1091,7 @@ void blobFlux(Mat img, int threshold, int median) {
 						img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
 
 
-						if (flux > 300 and area > 100) {
+						if (flux > min_flux and area > min_area) {
 							val = img.at<uchar>(k, l);
 							if (val > median) {
 								img_used.at<uchar>(k, l) = 120;  // 
@@ -1016,7 +1129,6 @@ void blobFlux(Mat img, int threshold, int median) {
 	return void();
 
 }
-
 
 void intensityPlot(Mat img, int x_peak, int y_peak) {
 	// Plots the intensity in x and y direction for a specified point (x_peak, y_peak). 
@@ -1066,7 +1178,7 @@ void intensityPlot(Mat img, int x_peak, int y_peak) {
 				x_min = j;
 			}
 		}
-		if (j - x_peak > max_dist) {
+		if (x_peak - j > max_dist or j == 0) {
 			x_min = j;
 			break;
 		}
@@ -1087,7 +1199,7 @@ void intensityPlot(Mat img, int x_peak, int y_peak) {
 				x_max = j;
 			}
 		}
-		if (j - x_peak > max_dist) {
+		if (j - x_peak > max_dist or j == img.cols) {
 			x_max = j;
 			break;
 		}
@@ -1108,7 +1220,7 @@ void intensityPlot(Mat img, int x_peak, int y_peak) {
 				y_min = i;
 			}
 		}
-		if (y_peak - i > max_dist) {
+		if (y_peak - i > max_dist or i == 0) {
 			y_min = i;
 			break;
 		}
@@ -1128,7 +1240,7 @@ void intensityPlot(Mat img, int x_peak, int y_peak) {
 				y_max = i;
 			}
 		}
-		if (i - y_peak > max_dist) {
+		if (i - y_peak > max_dist or i == img.rows) {
 			y_max = i;
 			break;
 		}
