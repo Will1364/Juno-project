@@ -17,16 +17,18 @@ Mat erodeLR(Mat img);
 
 // Image shifting
 Mat imShiftSimple(Mat img, array<float, 3> rot_prm);
-Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection = false);     // Creates a 3d array with [x,y,val] along the 3rd axis
+Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection);     // Creates a 3d array with [x,y,val] along the 3rd axis
 
 // Figures
 void intensityPlot(Mat img, int x_peak, int y_peak);
 
 // Other functions
 pair<Mat, Mat> blobCoordinates(Mat img);
-void blobFlux(Mat img, int threshold, int median);
+void blobFlux(Mat img, int threshold, int noise_floor);
 array<float, 3> coordinateLSQ(Mat img, bool lensCorrection = false);
 
+Mat eulerRot(int ax1, int ax2, int ax3, float ang1, float ang2, float ang3, bool useDeg = false);
+pair<float, float> angleCoord(float x, float y);
 
 */
 // 
@@ -39,6 +41,7 @@ pair<Mat, Mat> splitBinary(Mat img, int threshold) {
 	// Input: Intervowen image
 	// Output: Pair with two binary images 
 	//
+
 
 	// Parameters
 	int width = img.cols;		
@@ -211,8 +214,8 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	// Matrices to hold coordinates. Max set at 20 since it's probably way more than needed. 
 	int count = 0;		// Used to count number of stars found
 	
-	Mat x_pos(count_max, 1, CV_32FC1);
-	Mat y_pos(count_max, 1, CV_32FC1);
+	Mat x_pos(count_max + 1, 1, CV_32FC1);
+	Mat y_pos(count_max + 1, 1, CV_32FC1);
 
 	
 
@@ -350,7 +353,8 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 
 					count++;
 					if (count == count_max) {
-						cout << "Too many stars, using first " << count_max << "..." << endl;
+						cout << "blobCoordinates: Too many stars, using first " << count_max << "..." << endl;
+						return make_pair(x_pos, y_pos);
 					}
 				}
 				
@@ -393,6 +397,8 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	int threshold = 40;
 	int dist_max = 30;		// Used to remove objects in only one image if different amount of objects are found
 
+	cout << "LSQ: determining rotation paramters..." << endl;
+
 	// Parameter setup
 	pair<Mat, Mat> img_binary = splitBinary(img, threshold); 
 
@@ -402,8 +408,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	//cout << endl << "Stars in second image: " << endl;
 	pair<Mat, Mat> coord_one = blobCoordinates(img_binary.second);
 
-	cout << endl; 
-
+	
 	int N = 0;
 	int N2 = 0;
 
@@ -416,11 +421,11 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	
 	// Lens correction parameters
 	float dx = 8.6;				// Physical pixel size [µm]
-	float dy = 8.6;
+	float dy = 8.3;
 	float pix_ratio = dy / dx;	// Pixel ratio
 	int x_l0 = 383;				// Lens center (from Matlab script)
 	int y_l0 = 257;
-	int efl = 20006;			// Focal length also?  
+	int efl = 20006;			// Effective focal length 
 	double kappa = 3.3e-08;		// distortion correction 
 	double f = efl / dx;		// focal length
 	double r = 0;
@@ -441,7 +446,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 		N2++;
 	}
 
-	cout << "determining rotation paramters..." << endl; 
+	
 	
 
 	if (N != N2) {
@@ -472,7 +477,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 					if (dist_min > dist_max) {
 
-						for (int k = i; k < N + 1; k++) {
+						for (int k = i; k < N; k++) {
 							coord_one.first.at<float>(k, 0) = coord_one.first.at<float>(k + 1, 0);
 							coord_one.second.at<float>(k, 0) = coord_one.second.at<float>(k + 1, 0);
 						}
@@ -538,13 +543,13 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 		}
 
 		if (N != N2) {
-			cout << "Error LSQ: different amount of objects found in binary images, returning empty array... " << endl;
+			cout << "Error LSQ: different amount of objects found in binary images, returning empty array... " << endl << endl;
 			return parameters;
 		}
 		
 	}
 
-	cout << "valid objects found:  " << N << endl;
+	cout << "valid objects found: " << N << endl;
 
 	// Initialize variable: 
 	Mat x1(N, 1, CV_32FC1);
@@ -661,6 +666,16 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 		// cout << "G.Gt() inv: " << endl << ((G * G.t()).inv()).size() << endl;
 
+		if (abs(m_x - m.at<float>(1, 0)) / (m.at<float>(1, 0)) < 1e-6) {
+			
+			m_theta = m.at<float>(0, 0);
+			m_x = m.at<float>(1, 0);
+			m_y = m.at<float>(2, 0);
+
+			cout << "broke at itteration: " << j << endl;
+
+			break;
+		}
 
 		m_theta = m.at<float>(0, 0);
 		m_x = m.at<float>(1, 0);
@@ -763,27 +778,9 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 	// lensCorrection:	Enable/disable lens correction (true/false)
 	// 
 
-	// Parameters
-	double angle = rot_prm[2];   // Estimated rotation in test image, approximately 1.4 degrees
-	angle = angle / 2;
-
-	float x0 = rot_prm[0];							// Estimated origin of test image
-	float y0 = rot_prm[1];
-
-	float xt = 0;			// Temporary coord
-	float yt = 0;
-
-	int width = img.cols;					// Parameter setup
-	int height = img.rows;
-
-	double x_coord = 0;
-	double y_coord = 0;
-
-	Mat img_shift(height, width, CV_64FC3);
-
 	// Lens correction parameters
 	float dx = 8.6;			// Physical pixel size [µm]
-	float dy = 8.6;
+	float dy = 8.3;
 
 	float pix_ratio = dy / dx; // Pixel ratio
 
@@ -798,6 +795,26 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 	double r = 0;
 
 
+	// Parameters
+	double angle = rot_prm[2];				// Estimated rotation in test image, approximately 1.4 degrees
+	angle = angle / 2;
+
+	float x0 = rot_prm[0] - x_l0 * lensCorrection;					// Estimated origin of test image
+	float y0 = rot_prm[1] - y_l0 * lensCorrection;
+
+	float xt = 0;							// Temporary coord
+	float yt = 0;
+
+	int width = img.cols;					// Parameter setup
+	int height = img.rows;
+
+	double x_coord = 0;
+	double y_coord = 0;
+
+	Mat img_shift(height, width, CV_64FC3);
+
+	
+
 	// Rotation of the coordinates
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++) {
@@ -810,6 +827,7 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 
 				xt -= x_l0;
 				yt -= y_l0;
+
 				yt = yt * dy / dx;
 
 				r = sqrt(xt * xt + yt * yt);
@@ -818,8 +836,8 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 				xt = xt * r;
 				yt = yt * r;
 
-				xt += x_l0;
-				yt += y_l0 * dy / dx;
+				//xt += x_l0;
+				//yt += y_l0 * dy / dx;
 
 			}
 
@@ -855,7 +873,7 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 	return img_shift;
 }
 
-void blobFlux(Mat img, int threshold, int median) {
+void blobFlux(Mat img, int threshold, int noise_floor) {
 	// Finds blobs (stars) and determines their center coordinate and area. Returns list of coordinates (x, y). 
 	// Does simple errosion/dilation to remove noise/combine stripes to full stars, 
 	// and 4-connectedness to determine position/area of stars. 
@@ -938,6 +956,8 @@ void blobFlux(Mat img, int threshold, int median) {
 	double flux = 0;
 
 	int val = 0;
+
+	cout << "Object fluxes: " << endl;
 
 	// Scan through binary image 
 	for (int i = 1; i < height - 1; i++) {
@@ -1049,10 +1069,10 @@ void blobFlux(Mat img, int threshold, int median) {
 					for (int l = x_min; l < x_max + 1; l++) {
 
 						val = img.at<uchar>(k, l);
-						flux += img.at<uchar>(k, l) - median;
+						flux += img.at<uchar>(k, l) - noise_floor;
 
 						// Compute area and x_sum/y_sum for center value
-						if (val > 1 * median) {
+						if (val > 1 * noise_floor) {
 							// Add area
 							area += 1;
 							x_sum += l;
@@ -1093,7 +1113,7 @@ void blobFlux(Mat img, int threshold, int median) {
 
 						if (flux > min_flux and area > min_area) {
 							val = img.at<uchar>(k, l);
-							if (val > median) {
+							if (val > noise_floor) {
 								img_used.at<uchar>(k, l) = 120;  // 
 							}
 						}
@@ -1126,6 +1146,7 @@ void blobFlux(Mat img, int threshold, int median) {
 	imwrite("img_flux_used.png", img_used);
 
 	cout << endl;
+
 	return void();
 
 }
@@ -1353,5 +1374,133 @@ void intensityPlot(Mat img, int x_peak, int y_peak) {
 	imshow(windowName, imgPlot);
 
 	return void();
+
+}
+
+Mat eulerRot(int ax1, int ax2, int ax3, float ang1, float ang2, float ang3, bool useDeg) {
+	// Creates rotation matrix based on euler angles
+	// Inputs
+	// ax: Axis to rotate around 
+	// ang: Angle of rotation
+	// 
+	// Output
+	// Rotation matrix as Mat object (float) 
+	//
+	
+	// Parameter setup
+	array<float, 3> ax = { ax1, ax2, ax3 };
+	array<float, 3> ang = { ang1, ang2, ang3 };
+
+	float c = 0;
+	float s = 0;
+
+	// Convert from degress
+	if (useDeg) {
+		for (int i = 0; i < 3; i++) {
+			ang[i] = ang[i] * pi / 180;
+		}
+	}
+	
+	// Create empty matrix
+	Mat Rot(3, 3, CV_32FC1);
+	Mat tmp(3, 3, CV_32FC1);
+
+	Rot = 0;
+	tmp = 0;
+
+	// add ones to the diagonal: 
+	for (int i = 0; i < 3; i++) {
+		Rot.at<float>(i, i) = 1;
+	}
+	
+	// Calculate rotation matrix
+	for (int i = 0; i < 3; i++) {
+		c = cos(ang[i]);
+		s = sin(ang[i]);
+
+		// Calculate individual roation
+		if (ax[i] == 1) {
+			tmp.at<float>(0, 0) = 1;
+			tmp.at<float>(1, 1) = c;
+			tmp.at<float>(1, 2) = s;
+			tmp.at<float>(2, 1) = -s;
+			tmp.at<float>(2, 2) = c;
+		}
+		else if (ax[i] == 2) {
+			tmp.at<float>(0, 0) = c;
+			tmp.at<float>(0, 2) = -s;
+			tmp.at<float>(1, 1) = 1;
+			tmp.at<float>(2, 0) = s;
+			tmp.at<float>(2, 2) = c;
+		}
+		else if (ax[i] == 3) {
+			tmp.at<float>(0, 0) = c;
+			tmp.at<float>(0, 1) = s;
+			tmp.at<float>(1, 0) = -s;
+			tmp.at<float>(1, 1) = c;
+			tmp.at<float>(2, 2) = 1;
+		}
+
+		// Add to Rot matrix and reset tmp
+		Rot = tmp * Rot;
+		tmp = 0;
+
+	}
+
+	// Check and remove really small values (usually rounding errors
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			if (abs(Rot.at<float>(i, j)) < 1e-6) {
+				Rot.at<float>(i, j) = 0;
+			}
+		}
+	}
+
+	return Rot;
+}
+
+
+pair<float, float> angleCoord(float x, float y) {
+	// Calculate 'undistorted theta and rho mapping'
+	// Input: Image coordinate 
+	// Based on matlab code
+	// Not optimal for use with large number of points (since rotation matrix is calculated each time) 
+
+
+	// parameters
+	float dx = 8.6;				// Physical pixel size [µm]
+	float dy = 8.3;
+	float pix_ratio = dy / dx;	// Pixel ratio
+	int x_l0 = 383;				// Lens center (from Matlab script)
+	int y_l0 = 257;
+	int efl = 20006;			// Effective focal length 
+	double kappa = 3.3e-08;		// distortion correction 
+	double f = efl / dx;		// focal length
+	
+	// Convert to virtual CCD coordinates
+	float xp = (x - x_l0) / f;
+	float yp = (y - y_l0) * pix_ratio / f;
+
+	double r = sqrt(xp * xp + yp * yp + 1);
+	double theta = 0;
+	double rho = 0;
+	
+	Mat vec(1, 3, CV_32FC1);
+	Mat Rot = eulerRot(1, 2, 3, 167.387, 0.4255, -0.3141, true);		// Spacecraft rotation matrix, values from given script
+
+	// Vector coordinates
+	vec.at<float>(0, 0) = xp / r;
+	vec.at<float>(0, 1) = yp / r;
+	vec.at<float>(0, 2) = 1 / r;
+
+	vec = vec * Rot;
+
+	// Determine theta,rho angles
+	theta = atan2(vec.at<float>(0, 1), vec.at<float>(0, 0));
+	rho = acos(-vec.at<float>(0, 2));
+	
+	cout << "[theta, rho]: " << theta * float(180) / pi << ", " << rho * float(180) / pi << endl;
+
+	return make_pair(theta, rho);
 
 }
