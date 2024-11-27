@@ -7,8 +7,8 @@ Mat RemoveSmallParticleNoise(Mat image) {
 	copyMakeBorder(image2, image2, 2, 2, 1, 1, BORDER_CONSTANT, Scalar(0, 0, 0));
 
 	//Set some threshold values
-	int t1 = 35; //Sets the difference between a pixel and its imidiate neighbour - 35 works best for the unscaled images
-	int t2 = 9; //Sets the difference between the 2 neighbours of a pixel
+	int t1 = 30; //Sets the difference between a pixel and its imidiate neighbour - 35 works best for the unscaled images
+	int t2 = 2; //Sets the difference between the 2 neighbours of a pixel
 
 	int width = image2.cols;
 	int height = image2.rows;
@@ -54,14 +54,14 @@ Mat RemoveSmallParticleNoise(Mat image) {
 				}
 				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i - 2, j)) / 3;
 			}
-			else if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
-				if (j == 1) {
-					image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
-				}
-				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j)) / 5;
-			}
+			//else if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j +2)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
+				//if (j == 1) {
+					//image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
+				//}
+				//else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j)) / 5;
+			//}
 
-			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
 				if (j == 1) {
 					image2.at<uchar>(i, j) = (image2.at<uchar>(i + 2, j + 2) + image2.at<uchar>(i, j + 2) + image2.at<uchar>(i - 2, j)) / 3;
 				}
@@ -84,7 +84,13 @@ Mat RemoveSmallParticleNoise(Mat image) {
 				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i, j + 2) / 2);
 			}
 			
-			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i-2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
+			//else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i-2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
+				//if (j == 1) {
+					//image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
+				//}
+				//else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1)) / 4;
+			//}
+			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j +2)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
 				if (j == 1) {
 					image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
 				}
@@ -93,7 +99,11 @@ Mat RemoveSmallParticleNoise(Mat image) {
 
 		}
 	}
-
+	if ((image2.at<uchar>(355, 54) - image2.at<uchar>(355, 56)) > 2) {
+		cout << "hiiii" << endl;
+	}
+	cout << (image2.at<uchar>(355, 54) - image2.at<uchar>(355, 56)) << endl;
+	cout << "hi" << endl; 
 	image2 = image2.rowRange(2, image2.rows - 2).colRange(1, image2.cols - 1);
 	
 	Mat ImDif;
@@ -485,9 +495,33 @@ Mat RemoveLightColumnProfile(Mat image) {
 Mat RemoveLens(Mat image) {
 	Mat lens= imread("C:/Users/Bruger/Desktop/30330 project/Lense2.bmp", 0);
 	Mat image2;
-	
+	int width = image.cols;
+	int height = image.rows;
+	int n = 0;
 	//The produced lense profile is much brighter than what is seen on the science immages. Therefore it should be scaled according to the image
-	image2 = image - lens * 0.3; //0.3 is an estimate, but visually looks ok
+
+	vector<float> IMG;
+	vector<float> LENS;
+
+
+
+	for (int i = 200; i < 300 ; i++) {
+		for (int j = 300; j < 400 ; j++) {
+			IMG.push_back(image.at<uchar>(i, j));
+			LENS.push_back(lens.at<uchar>(i, j));
+			n++;
+		}
+	}
+	
+	sort(IMG.begin(), IMG.end());
+	sort(LENS.begin(), LENS.end());
+
+	//cout << i << "   " << rowV[n / 2] << endl;
+	float MedIm = IMG[n / 2];
+	float MedL = LENS[n / 2];
+
+	image2 = image - lens * (MedIm / MedL); //ratio is approx. 0.299
+	cout << (MedIm / MedL) << endl;
 
 	namedWindow("image with light", WINDOW_NORMAL);
 	resizeWindow("image with light", image2.rows * 2, image2.cols * 2);
