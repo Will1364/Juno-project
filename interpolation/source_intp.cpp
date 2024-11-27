@@ -9,7 +9,7 @@
 /*
 
 // Interpolation
-Mat interpolateNN(Mat img, int arr_size);
+Mat interpolateNN(Mat img, int arr_size, bool lensCorrection);
 
 // Interpolation cores
 double intpCoreNNPlus(vector<float> min_d, vector<float> min_v, int max_dist);
@@ -20,7 +20,7 @@ double intpCoreRadialBasis(int x_, int y_, vector<float> min_d, vector<int> min_
 //
 
 
-Mat interpolateNN(Mat img, int arr_size) {
+Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 	// Finds the nearest n (arr_size) neighbours for each point, and runs through an interpolation core, 
 	// a seperate function for finding an 'optimal' value for the pixel. 
 	// Interpolation 'core' (type of interpolation), can be changed further down. 
@@ -38,7 +38,7 @@ Mat interpolateNN(Mat img, int arr_size) {
 	// Variables : 
 	int search = 50;		// NxN search area around each pixel. 50 is a good balance between compute time and extra buffer 
 	int padding = 0;		// Number of pixels to remove from the border. 
-	float max_dist = 2;		// The furthest away 'closest' pixel can be 
+	float max_dist = 1.5;	// The furthest away 'closest' pixel can be 
 	float min_dist = 0.05;  // If min distance is closer than this, uses uninterpolated value. Set to zero or negative to disable
 
 	// Parameter setup
@@ -73,6 +73,9 @@ Mat interpolateNN(Mat img, int arr_size) {
 	int progress = 1;	// Used to display progress
 	int count_mindist = 0;
 
+	// Lens correction
+	int x_l0 = 383;				// Lens center (from Matlab script)
+	int y_l0 = 257;
 
 	// Interpolation function
 	cout << "interpolating";
@@ -89,8 +92,8 @@ Mat interpolateNN(Mat img, int arr_size) {
 			}
 
 			// Search center coordinate (in input image)  
-			s_y = i + padding - (search / 2);
-			s_x = j + padding - (search / 2);
+			s_y = i + padding - (search / 2); // -y_l0 * lensCorrection;
+			s_x = j + padding - (search / 2); // -x_l0 * lensCorrection;
 
 			// Fills search window with distance to point in a search x search grid around 
 			// Finds nearest arr_size values within search window 
@@ -101,7 +104,7 @@ Mat interpolateNN(Mat img, int arr_size) {
 					if (s_y + k > 0 and s_y + k < height and s_x + l > 0 and s_x + l < width) {
 
 						// Calculate distance
-						dist = sqrt(pow(img.at<Vec3d>(s_y + k, s_x + l)[0] - j, 2) + pow(img.at<Vec3d>(s_y + k, s_x + l)[1] - i, 2));
+						dist = sqrt(pow(img.at<Vec3d>(s_y + k, s_x + l)[0] - (j - x_l0 * lensCorrection), 2) + pow(img.at<Vec3d>(s_y + k, s_x + l)[1] - (i - y_l0 * lensCorrection), 2));
 
 
 						// Update arrays if with closest values 
