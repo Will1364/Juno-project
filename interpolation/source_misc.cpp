@@ -56,7 +56,7 @@ pair<Mat, Mat> splitBinary(Mat img, int threshold) {
 		for (int j = 0; j < width; j++) {
 		
 			// Even rows
-			if (i % 2 == 0) {
+			if (i % 2 + border_pad % 2 == 0) {
 				img_bn2.at<uchar>(i, j) = 0;
 			}
 
@@ -72,6 +72,46 @@ pair<Mat, Mat> splitBinary(Mat img, int threshold) {
 	return make_pair(img_bn1, img_bn2);
 
 }
+
+pair<Mat, Mat> splitUint(Mat img) {
+	// Split image into two binaries
+	// For use with coordinateLSQ function
+	// 
+	// Input: Intervowen image
+	// Output: Pair with two binary images 
+	//
+
+
+	// Parameters
+	int width = img.cols;
+	int height = img.rows;
+
+	Mat img_bn1, img_bn2;
+	img.copyTo(img_bn1);
+	img.copyTo(img_bn2);
+
+	// Go through and split image
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+
+			// Even rows
+			if (i % 2 + border_pad % 2 == 0) {
+				img_bn2.at<uchar>(i, j) = 0;
+			}
+
+			// Odd rows
+			else {
+				img_bn1.at<uchar>(i, j) = 0;
+			}
+
+
+		}
+	}
+
+	return make_pair(img_bn1, img_bn2);
+
+}
+
 
 Mat erodeLR(Mat img) {
 	// Errodes image in left and right direction
@@ -139,7 +179,7 @@ Mat dilateCross(Mat img) {
 	return img_tmp;
 }
 
-pair<Mat, Mat> blobCoordinates(Mat img) {
+pair<Mat, Mat> blobCoordinates(Mat img, int threshold) {
 	// Finds blobs (stars) and determines their center coordinate and area. Returns list of coordinates (x, y). 
 	// Does simple errosion/dilation to remove noise/combine stripes to full stars, 
 	// and 4-connectedness to determine position/area of stars. 
@@ -160,10 +200,14 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	int area_min = 25;		// Minimum area for object to count
 	int area_max = 450;		// Maximum area
 	int count_max = 20;		// Maximum number of object to use 
+	bool use_max_val = false;  // Tells it to use the max val in a star instead of COM
+	bool use_COM_weight = true;
 
 	// Paramter setup
-	Mat img_tmp;
-	img.copyTo(img_tmp);		// Temporary image for analysis
+	Mat img_tmp = img > threshold;
+
+
+	// img.copyTo(img_tmp);		// Temporary image for analysis
 
 	int width = img.cols;		// Parameter setup
 	int height = img.rows;
@@ -186,16 +230,18 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	// dilate back to make stars uniform 
 	img_tmp = dilateCross(img_tmp);
 	img_tmp = dilateCross(img_tmp);
-
+	img_tmp = dilateCross(img_tmp);
+	img_tmp = dilateCross(img_tmp);
+	
 	// More parameters
 	int border = 0;
-	int area = 0;
+	double area = 0;
 
 	int x = 0;
 	int y = 0;
 
-	int x_sum = 0;
-	int y_sum = 0;
+	double x_sum = 0;
+	double y_sum = 0;
 
 	int x_min = 0;
 	int x_max = 0;
@@ -209,7 +255,14 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 	int direction = 0;
 	bool skip_left = false;
 
-	int val = 0;
+	int val = 0;		// Binary 
+
+	int star_val = 0;		// For finding maxval
+	int star_peak_x = 0;
+	int star_peak_y = 0;
+	int star_peak = 0;
+
+	double flux = 0;
 
 	// Matrices to hold coordinates. Max set at 20 since it's probably way more than needed. 
 	int count = 0;		// Used to count number of stars found
@@ -328,15 +381,39 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 					for (int l = x_min; l < x_max + 1; l++) {
 
 						val = img_tmp.at<uchar>(k, l);
+						star_val = img.at<uchar>(k, l);
+
+
+						
 
 						// Compute area and x_sum/y_sum for center value
 						if (val == 255) {
 							// Add area
-							area += 1;
-							x_sum += l;
-							y_sum += k;
+
+							if (use_COM_weight) {
+								area += 1;
+
+								x_sum += l * star_val;
+								y_sum += k * star_val;
+
+								flux += star_val;
+							}
+							else {
+								area += 1;
+
+								x_sum += l;
+								y_sum += k;
+							}
+
+							
 
 							img_tmp.at<uchar>(k, l) = 0;
+						}
+
+						if (star_val > star_peak) {
+							star_peak = star_val;
+							star_peak_x = l;
+							star_peak_y = k;
 						}
 
 					}
@@ -346,10 +423,21 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 				// Save coordinate if area of object is within conditions
 				if (area > area_min and area < area_max and count < count_max) {
 
-					x_pos.at<float>(count, 0) = float(x_sum) / area;
-					y_pos.at<float>(count, 0) = float(y_sum) / area;
+					if (use_max_val) {
+						x_pos.at<float>(count, 0) = star_peak_x;
+						y_pos.at<float>(count, 0) = star_peak_y;
+					}
+					else if (use_COM_weight) {
+						x_pos.at<float>(count, 0) = x_sum / flux;
+						y_pos.at<float>(count, 0) = y_sum / flux;
+					}
+					else {
+						x_pos.at<float>(count, 0) = float(x_sum) / area;
+						y_pos.at<float>(count, 0) = float(y_sum) / area;
+					}
+					
 
-					// cout << "" << int(x_pos.at<float>(count, 0)) << ", " << int(y_pos.at<float>(count, 0)) << ", area: " << area << endl;
+					//cout << "[x,y]: " << (x_pos.at<float>(count, 0)) << ", " << (y_pos.at<float>(count, 0)) << ", area: " << area << endl;
 
 					count++;
 					if (count == count_max) {
@@ -363,6 +451,8 @@ pair<Mat, Mat> blobCoordinates(Mat img) {
 				y_sum = 0;
 				area = 0;
 				border = 0;
+				star_peak = 0;
+				flux = 0;
 
 			}
 
@@ -400,13 +490,16 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	cout << "LSQ: determining rotation paramters..." << endl;
 
 	// Parameter setup
-	pair<Mat, Mat> img_binary = splitBinary(img, threshold); 
+	pair<Mat, Mat> img_binary = splitUint(img); 
+
+
+
 
 	//cout << "Stars in first image: " << endl;
-	pair<Mat, Mat> coord_two = blobCoordinates(img_binary.first);
+	pair<Mat, Mat> coord_two = blobCoordinates(img_binary.first, threshold);
 
 	//cout << endl << "Stars in second image: " << endl;
-	pair<Mat, Mat> coord_one = blobCoordinates(img_binary.second);
+	pair<Mat, Mat> coord_one = blobCoordinates(img_binary.second, threshold);
 
 	
 	int N = 0;
@@ -423,8 +516,8 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	float dx = 8.6;				// Physical pixel size [µm]
 	float dy = 8.3;
 	float pix_ratio = dy / dx;	// Pixel ratio
-	int x_l0 = 383;				// Lens center (from Matlab script)
-	int y_l0 = 257;
+	int x_l0 = 383 - border_pad;				// Lens center (from Matlab script)
+	int y_l0 = 257 - border_pad;
 	int efl = 20006;			// Effective focal length 
 	double kappa = 3.3e-08;		// distortion correction 
 	double f = efl / dx;		// focal length
@@ -447,9 +540,15 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	}
 
 	
-	
+	if (N == 0 or N2 == 0) {
+		cout << "Error LSQ: No objects found in image, returning zeroes..." << endl << endl;
+		return parameters; 
+	}
 
 	if (N != N2) {
+		
+
+		cout << "Error LSQ: different amount of objects found in binary images, " << N << "/" << N2 << ", trying to remove invalid values" << endl;
 
 		// Loop through distance test twice 
 		// (In case there are more invalid coords in set two but, but still invalid coords in set 1)
@@ -543,7 +642,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 		}
 
 		if (N != N2) {
-			cout << "Error LSQ: different amount of objects found in binary images, returning empty array... " << endl << endl;
+			cout << "Error LSQ: Couldn't match objects, returning emtpy array..." << endl << endl;
 			return parameters;
 		}
 		
@@ -568,8 +667,8 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	Mat G(2 * N, 3, CV_32FC1);
 
 	double m_theta = -1.5 * pi/180;
-	double m_x = 370;
-	double m_y = -240;
+	double m_x = 380;
+	double m_y = -250;
 
 	Mat m(3, 1, CV_32FC1);
 	m.at<float>(0, 0) = m_theta;
@@ -631,7 +730,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 	}
 
 	// Non linear least squares computation
-	for (int j = 0; j < 20; j++) {
+	for (int j = 0; j < 50; j++) {
 
 		// Calculate g0
 		for (int i = 0; i < 2 * N; i++) {
@@ -666,6 +765,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 		// cout << "G.Gt() inv: " << endl << ((G * G.t()).inv()).size() << endl;
 
+		/*
 		if (abs(m_x - m.at<float>(1, 0)) / (m.at<float>(1, 0)) < 1e-6) {
 			
 			m_theta = m.at<float>(0, 0);
@@ -676,6 +776,7 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 
 			break;
 		}
+		*/
 
 		m_theta = m.at<float>(0, 0);
 		m_x = m.at<float>(1, 0);
@@ -708,7 +809,7 @@ Mat imShiftSimple(Mat img, array<float, 3> rot_prm) {
 	// 
 
 	// Parameter setup
-	float angle = rot_prm[2];
+	float angle = -rot_prm[2];
 
 	float x0 = rot_prm[0];							// Estimated origin of test image
 	float y0 = rot_prm[1];
@@ -719,38 +820,44 @@ Mat imShiftSimple(Mat img, array<float, 3> rot_prm) {
 	int x_shift = 0;
 	int y_shift = 0;
 
+	int count = 0;
+
 	Mat img_shift(height, width, 0);
 
 	// Debugging paramters 
 	Mat vals_used(height, width, CV_8UC1);		// Mat used to mark used pixels for debugging
 	vals_used = 255;
 
+	cout << "Performing 'simple shift'..." << endl;
+
 	// Loop through every pixel in the image and calculate shift for every other row: 
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++) {
 
 			// Keeps odd rows
-			if (i % 2 == 1) {
+			if (i % 2 + border_pad % 2 == 0) {
 
 				img_shift.at<uchar>(i, j) = img.at<uchar>(i, j);
 				vals_used.at<uchar>(i, j) = 0;
+				
 			}
 
-			else if (i % 2 == 0) {
+			else if (i % 2 + border_pad % 2 == 1) {
 
 				x_shift = ((j - x0) * cos(angle) - (i - y0) * sin(angle)) + x0;
 				y_shift = ((j - x0) * sin(angle) + (i - y0) * cos(angle)) + y0;
-				y_shift = y_shift + y_shift % 2;
+				y_shift = y_shift + (1 - y_shift % 2);
 
 				// Checks if shifted coordinates is within input image, else sets val to 0
 				if (x_shift >= 0 and x_shift < width and y_shift >= 0 and y_shift < height) {
 
 					img_shift.at<uchar>(i, j) = img.at<uchar>(y_shift, x_shift);
 					vals_used.at<uchar>(y_shift, x_shift) = 0;
-
+					
 				}
 				else {
 					img_shift.at<uchar>(i, j) = 0;
+					count++;
 				}
 
 			}
@@ -759,9 +866,10 @@ Mat imShiftSimple(Mat img, array<float, 3> rot_prm) {
 
 	}
 
+	cout << "done. Fraction of unused values: " << float(count)/(width * height) << endl << endl;
 
-	//namedWindow("Vals used in rotation", WINDOW_AUTOSIZE);
-	//imshow("Vals used in rotation", vals_used);
+	namedWindow("Vals used in rotation", WINDOW_AUTOSIZE);
+	imshow("Vals used in rotation", vals_used);
 
 	// Return despinned image
 	return img_shift;
@@ -784,8 +892,8 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 
 	float pix_ratio = dy / dx; // Pixel ratio
 
-	int x_l0 = 383;			// Radial distortion center (from Matlab script)
-	int y_l0 = 257;
+	int x_l0 = 383 - border_pad;			// Radial distortion center (from Matlab script)
+	int y_l0 = 257 - border_pad;
 
 	int efl = 20006;		// Effective focal length
 	double kappa = 3.3e-08; // Radial distortion correction 
@@ -921,7 +1029,6 @@ void blobFlux(Mat img, int threshold, int noise_floor) {
 	img_tmp = dilateCross(img_tmp); 
 	img_tmp = dilateCross(img_tmp); 
 	img_tmp = dilateCross(img_tmp); 
-
 
 
 	Mat img_used; 
@@ -1068,27 +1175,34 @@ void blobFlux(Mat img, int threshold, int noise_floor) {
 				for (int k = y_min; k < y_max + 1; k++) {
 					for (int l = x_min; l < x_max + 1; l++) {
 
-						val = img.at<uchar>(k, l);
-						flux += img.at<uchar>(k, l) - noise_floor;
+						if (img_tmp.at<uchar>(k, l) == 255) {
+							
+							val = img.at<uchar>(k, l);
+							
 
-						// Compute area and x_sum/y_sum for center value
-						if (val > 1 * noise_floor) {
-							// Add area
-							area += 1;
-							x_sum += l;
-							y_sum += k;
+							// Compute area and x_sum/y_sum for center value
+							if (val > 1 * noise_floor) {
+								
+								flux += img.at<uchar>(k, l) - noise_floor;
+								img_used.at<uchar>(k, l) = 120;
 
-							// img_used.at<uchar>(k, l) = 120;
+								// Add area
+								area += 1;
+								x_sum += l;
+								y_sum += k;
+
+								// img_used.at<uchar>(k, l) = 120;
 
 
-							if (val > val_peak) {
-								val_peak = val;
-								x_peak = l;
-								y_peak = k;
+								if (val > val_peak) {
+									val_peak = val;
+									x_peak = l;
+									y_peak = k;
+								}
 							}
-						}
 
-						// img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
+							// img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
+						}
 
 					}
 
@@ -1097,11 +1211,15 @@ void blobFlux(Mat img, int threshold, int noise_floor) {
 
 				if (flux > min_flux and area > min_area) {
 					
+					//intensityPlot(img, x_peak, y_peak);  // Plot intensity distribution
+
 					cout << "flux: " << flux;
 					// cout << ", [x,y]: " << x_sum / area << ", " << y_sum / area;
 					cout << ", [x,y]: " << x_peak << ", " << y_peak;
 					cout << ", area: " << area;
 					cout << endl;
+
+					
 				}
 				
 				// Remove blob from image
@@ -1110,13 +1228,14 @@ void blobFlux(Mat img, int threshold, int noise_floor) {
 
 						img_tmp.at<uchar>(k, l) = 0;		// Remove blob from binary image
 
-
+						/*
 						if (flux > min_flux and area > min_area) {
 							val = img.at<uchar>(k, l);
 							if (val > noise_floor) {
 								img_used.at<uchar>(k, l) = 120;  // 
 							}
 						}
+						*/
 
 					}
 
@@ -1145,233 +1264,7 @@ void blobFlux(Mat img, int threshold, int noise_floor) {
 
 	imwrite("img_flux_used.png", img_used);
 
-	cout << endl;
-
-	return void();
-
-}
-
-void intensityPlot(Mat img, int x_peak, int y_peak) {
-	// Plots the intensity in x and y direction for a specified point (x_peak, y_peak). 
-	// Restricts size to 
-	// 
-	
-	// Variables 
-	int height = 260;		// Size of plot
-	int width = 260 * 2;
-
-	int noiseFloor = 20;	// Noise floor -> used to determine 'end' of object 
-	int padding = 5;		// Number of points beneath noise floor before ending 
-	int max_dist = 20;		// Maximum  distance from peak (-> maximum 40 point wide figure)
-
-	// Parameters
-	Mat imgPlot(height, width, CV_8UC1);
-	imgPlot = 0;
-
-	int x_min = 0;
-	int y_min = 0;
-	int x_max = 0;
-	int y_max = 0;
-
-	int val = 0;
-	int tmp = 0;
-
-	// Drawing parameters
-	int pointWidth = 0;
-	int y0 = 0;
-	int y1 = 0;
-	Point pt1, pt2;
-
-	int arr_size_x = 0;
-	int arr_size_y = 0;
-	int arr_width = 0;
-
-	// Find x_min
-	for (int j = x_peak; tmp < padding + 1; j--) {
-		val = img.at<uchar>(y_peak, j);
-
-		if (val > noiseFloor and tmp > 0) {
-			tmp--;
-		}
-		else if (val < noiseFloor) {
-			tmp++;
-			if (tmp == padding) {
-				x_min = j;
-			}
-		}
-		if (x_peak - j > max_dist or j == 0) {
-			x_min = j;
-			break;
-		}
-	}
-	tmp = 0;
-
-	// Find x_max 
-	for (int j = x_peak; tmp < padding + 1; j++) {
-		
-		val = img.at<uchar>(y_peak, j);
-		
-		if (val > noiseFloor and tmp > 0) {
-			tmp--;
-		}
-		else if (val < noiseFloor) {
-			tmp++;
-			if (tmp == padding) {
-				x_max = j;
-			}
-		}
-		if (j - x_peak > max_dist or j == img.cols) {
-			x_max = j;
-			break;
-		}
-	}
-	tmp = 0;
-
-
-	// Find y_min
-	for (int i = y_peak; tmp < padding + 1; i--) {
-		val = img.at<uchar>(i, x_peak);
-
-		if (val > noiseFloor and tmp > 0) {
-			tmp--;
-		}
-		else if (val < noiseFloor) {
-			tmp++;
-			if (tmp == padding) {
-				y_min = i;
-			}
-		}
-		if (y_peak - i > max_dist or i == 0) {
-			y_min = i;
-			break;
-		}
-	}
-	tmp = 0;
-
-	// Find y_max
-	for (int i = y_peak; tmp < padding + 1; i++) {
-		val = img.at<uchar>(i, x_peak);
-
-		if (val > noiseFloor and tmp > 0) {
-			tmp--;
-		}
-		else if (val < noiseFloor) {
-			tmp++;
-			if (tmp == padding) {
-				y_max = i;
-			}
-		}
-		if (i - y_peak > max_dist or i == img.rows) {
-			y_max = i;
-			break;
-		}
-	}
-	tmp = 0;
-
-
-	arr_size_x = x_max - x_min + 1;
-	arr_size_y = y_max - y_min + 1;
-	arr_width = max(x_peak - x_min, y_peak - y_min) + max(x_max - x_peak, y_max - y_peak);	// Combined width 
-
-	vector<int> x_arr(arr_size_x, 0);
-	vector<int> y_arr(arr_size_y, 0);
-
-	// Fill x-array
-	for (int j = x_min; j <= x_max; j++) {
-		x_arr[j - x_min] = img.at<uchar>(y_peak, j);
-	}
-
-	// Fill y-array
-	for (int i = y_min; i <= y_max; i++) {
-		y_arr[i- y_min] = img.at<uchar>(i, x_peak);
-	}
-
-	// Width of points
-	pointWidth = (width) / arr_width;
-	
-	
-	// Draw x-grid 
-	for (int i = 0; i <= arr_width; i++) {
-		pt1 = Point2d((i) * pointWidth, 0);
-		pt2 = Point2d((i) * pointWidth, height);
-
-		line(imgPlot, pt1, pt2, 40);
-	}
-	// Line at peak position
-	tmp = max(x_peak - x_min, y_peak - y_min);
-	pt1 = Point2d((tmp)*pointWidth, 0);
-	pt2 = Point2d((tmp)*pointWidth, height);
-	line(imgPlot, pt1, pt2, 60);
-	
-
-
-
-
-	// Plot y-direction
-	tmp = max(x_peak - x_min, y_peak - y_min) - (y_peak - y_min);
-	for (int i= 0; i < arr_size_y; i++) {
-		if (i == 0) {
-			y0 = height;
-			y1 = height - y_arr[i];
-
-			pt1 = Point2d((i + tmp + 1) * pointWidth, y0);
-			pt2 = Point2d((i + tmp + 1) * pointWidth, y1);
-		}
-		else if (i == arr_size_y - 1) {
-			y0 = height;
-			y1 = height - y_arr[i];
-
-			pt1 = Point2d((i + tmp) * pointWidth, y0);
-			pt2 = Point2d((i + tmp) * pointWidth, y1);
-		}
-		else {
-			y0 = height - y_arr[i];
-			y1 = height - y_arr[i + 1];
-
-			pt1 = Point2d((i + tmp) * pointWidth, y0);
-			pt2 = Point2d((i + tmp + 1) * pointWidth, y1);
-		}
-
-		
-		line(imgPlot, pt1, pt2, 200);
-
-	}
-
-	// Plot x-direction
-	tmp = max(x_peak - x_min, y_peak - y_min) - (x_peak - x_min);
-	for (int j = 0; j < arr_size_x; j++) {
-		if (j == 0) {
-			y0 = height;
-			y1 = height - x_arr[j];
-
-			pt1 = Point2d((j + tmp + 1) * pointWidth, y0);
-			pt2 = Point2d((j + tmp + 1) * pointWidth, y1);
-		}
-		else if (j == arr_size_x - 1) {
-			y0 = height;
-			y1 = height - x_arr[j];
-
-			pt1 = Point2d((j + tmp) * pointWidth, y0);
-			pt2 = Point2d((j + tmp) * pointWidth, y1);
-		}
-		else {
-			y0 = height - x_arr[j];
-			y1 = height - x_arr[j + 1];
-
-			pt1 = Point2d((j + tmp) * pointWidth, y0);
-			pt2 = Point2d((j + tmp + 1) * pointWidth, y1);
-		}
-
-		
-
-		line(imgPlot, pt1, pt2, 100);
-
-	}
-
-
-	string windowName = "Intensity plot for object at [" + to_string(x_peak) + ", " + to_string(y_peak) + "]";
-	namedWindow(windowName, WINDOW_AUTOSIZE);
-	imshow(windowName, imgPlot);
+	cout << endl << endl;
 
 	return void();
 
@@ -1468,14 +1361,14 @@ pair<float, float> angleCoord(float x, float y) {
 
 
 	// parameters
-	float dx = 8.6;				// Physical pixel size [µm]
+	float dx = 8.6;					// Physical pixel size [µm]
 	float dy = 8.3;
-	float pix_ratio = dy / dx;	// Pixel ratio
-	int x_l0 = 383;				// Lens center (from Matlab script)
-	int y_l0 = 257;
-	int efl = 20006;			// Effective focal length 
-	double kappa = 3.3e-08;		// distortion correction 
-	double f = efl / dx;		// focal length
+	float pix_ratio = dy / dx;		// Pixel ratio
+	int x_l0 = 383 - border_pad;	// Lens center (from Matlab script)
+	int y_l0 = 257 - border_pad;
+	int efl = 20006;				// Effective focal length 
+	double kappa = 3.3e-08;			// distortion correction 
+	double f = efl / dx;			// focal length
 	
 	// Convert to virtual CCD coordinates
 	float xp = (x - x_l0) / f;
@@ -1503,4 +1396,411 @@ pair<float, float> angleCoord(float x, float y) {
 
 	return make_pair(theta, rho);
 
+}
+
+
+array<float, 3> coordinateLSQMulti(string im_names, bool lensCorrection) {
+	// An expansion of coordinateLSQ to work with multiple images. 
+	// Reads specified images from given folder. 
+	// Names should be given as: "img01.png,img02.png,img03.png," 
+	// The commma at the end is necessary, otherwise it skips the last image. 
+	// 
+	// Least squares solution to find rotation parameters for image. 
+	// Based on non-linear least squares.
+	// 
+	// Depend on the following functions: 
+	// splitBinary
+	// blobCoordinates
+	//		erodeLR
+	//		dilateCross
+	// 
+	// Inputs 
+	// img:				Image, interlaced
+	// lensCorrection:  true/false if lens correction should be enabled
+	//					currently doesn't work properly
+	// 
+	// Ouput
+	// Roation parameters as array [x, y, theta]
+	// 
+
+	// Variables 
+	int threshold = 40;
+	int dist_max = 30;		// Used to remove objects in only one image if different amount of objects are found
+
+	cout << "MultiLSQ: determining rotation paramters..." << endl;
+
+	Mat img; 
+
+	// Parameter setup
+	pair<Mat, Mat> img_binary;// = splitBinary(img, threshold);
+
+	//cout << "Stars in first image: " << endl;
+	pair<Mat, Mat> coord_two;// = blobCoordinates(img_binary.first);
+
+	//cout << endl << "Stars in second image: " << endl;
+	pair<Mat, Mat> coord_one;// = blobCoordinates(img_binary.second);
+
+	int N = 0;
+	int N2 = 0;
+	int N_points = 0;
+
+	int tmp = 0;
+	float dist = 0;
+	float dist_min = 9999;
+
+
+	array<float, 3> parameters = { 0, 0, 0 };
+
+	Mat coord_one_first_old; 
+	Mat coord_one_second_old;
+	Mat coord_one_first_new;
+	Mat coord_one_second_new;
+
+	Mat coord_two_first_old;
+	Mat coord_two_second_old;
+	Mat coord_two_first_new;
+	Mat coord_two_second_new;
+
+	// Lens correction parameters
+	float dx = 8.6;				// Physical pixel size [µm]
+	float dy = 8.3;
+	float pix_ratio = dy / dx;	// Pixel ratio
+	int x_l0 = 383 - border_pad;				// Lens center (from Matlab script)
+	int y_l0 = 257 - border_pad;
+	int efl = 20006;			// Effective focal length 
+	double kappa = 3.3e-08;		// distortion correction 
+	double f = efl / dx;		// focal length
+	double r = 0;
+
+	string delimiter = ",";  
+	string token = ""; 
+	string path = "G:/My Drive/UNI/30330 Image Analysis with Microcomputer/30330 Project/pngs_lsq/"; 
+
+	while (im_names.find(delimiter) < 99) {
+		token = im_names.substr(0, im_names.find(delimiter));
+		im_names.erase(0, im_names.find(delimiter) + delimiter.length());
+		cout << "Searcing image: " << token << endl;
+
+		N = 0;
+		N2 = 0;
+
+		coord_one_first_new.copyTo(coord_one_first_old);
+		coord_one_second_new.copyTo(coord_one_second_old);
+		coord_two_first_new.copyTo(coord_two_first_old);
+		coord_two_second_new.copyTo(coord_two_second_old);
+
+		// Load image
+		img = imread(path + token, IMREAD_GRAYSCALE);
+		//img = RemoveSmallParticleNoise(img);
+
+		// Split image 
+		img_binary = splitBinary(img, threshold);
+
+		// Find coordinates of objects 
+		coord_two = blobCoordinates(img_binary.first, threshold);
+		coord_one = blobCoordinates(img_binary.second, threshold);
+
+		// Check that the same amount of stars is found: 
+		for (int i = 0; i < coord_one.first.rows; i++) {
+			if (coord_one.first.at<float>(i, 0) < 0) {
+				break;
+			}
+			N++;
+		}
+
+		for (int i = 0; i < coord_two.first.rows; i++) {
+			if (coord_two.first.at<float>(i, 0) < 0) {
+				break;
+			}
+			N2++;
+		}
+
+		if (N == 0 or N2 == 0) {
+			cout << "Error LSQ: No objects found in image, returning zeroes..." << endl << endl;
+			return parameters;
+		}
+
+		if (N != N2) {
+
+			cout << "   Warning: different amount of objects found in binary images, " << N << "/" << N2 << ", trying to remove invalid values" << endl;
+
+			// Loop through distance test twice 
+			// (In case there are more invalid coords in set two but, but still invalid coords in set 1)
+			for (int l = 0; l < 2; l++) {
+
+				// If more objects are found in first image: 
+				if (N > N2) {
+
+					// Remove corrdinates for objects with no nearby objects in other image
+					for (int i = 0; i < N; i++) {
+
+						dist_min = 9999;
+
+						for (int j = 0; j < N2; j++) {
+
+							// Determine closest coordinate set: 
+							dist = pow((coord_one.first.at<float>(i, 0) - coord_two.first.at<float>(j, 0)), 2) + pow((coord_one.second.at<float>(i, 0) - coord_two.second.at<float>(j, 0)), 2);
+							dist = sqrt(dist);
+
+							if (dist < dist_min) {
+								dist_min = dist;
+							}
+
+						}
+
+						if (dist_min > dist_max) {
+
+							for (int k = i; k < N; k++) {
+								coord_one.first.at<float>(k, 0) = coord_one.first.at<float>(k + 1, 0);
+								coord_one.second.at<float>(k, 0) = coord_one.second.at<float>(k + 1, 0);
+							}
+
+						}
+
+					}
+
+					// Calculate number of valid coordinates again
+					N = 0;
+					for (int i = 0; i < coord_one.first.rows; i++) {
+						if (coord_one.first.at<float>(i, 0) < 0) {
+							break;
+						}
+						N++;
+					}
+
+
+				}
+
+
+				if (N2 > N) {
+					// Remove objects with no nearby object in other image
+					tmp = 0;
+					for (int i = 0; i < N; i++) {
+
+						dist_min = 9999;
+
+						for (int j = 0; j < N2; j++) {
+
+							// Determine closest coordinate set: 
+							dist = pow((coord_one.first.at<float>(j, 0) - coord_two.first.at<float>(i, 0)), 2) + pow((coord_one.second.at<float>(j, 0) - coord_two.second.at<float>(i, 0)), 2);
+							dist = sqrt(dist);
+
+							if (dist < dist_min) {
+								dist_min = dist;
+							}
+
+						}
+
+						if (dist_min > dist_max) {
+
+							for (int k = i; k < N + 1; k++) {
+								coord_two.first.at<float>(k, 0) = coord_two.first.at<float>(k + 1, 0);
+								coord_two.second.at<float>(k, 0) = coord_two.second.at<float>(k + 1, 0);
+							}
+
+						}
+
+					}
+
+					// Calculate number of valid coordinates again
+					N2 = 0;
+					for (int i = 0; i < coord_two.first.rows; i++) {
+						if (coord_two.first.at<float>(i, 0) < 0) {
+							break;
+						}
+						N2++;
+					}
+
+
+				}
+			}
+
+			if (N != N2) {
+				cout << "Error LSQ: Couldn't match objects, returning emtpy array..." << endl << endl;
+				return parameters;
+			}
+
+		}
+
+		
+		// Add new values to mat objects; 
+		coord_one_first_new = Mat::zeros(N_points + N, 1, CV_32FC1);
+		coord_one_second_new = Mat::zeros(N_points + N, 1, CV_32FC1);
+		coord_two_first_new = Mat::zeros(N_points + N, 1, CV_32FC1);
+		coord_two_second_new = Mat::zeros(N_points + N, 1, CV_32FC1);
+
+		for (int i = 0; i < N_points; i++) {
+			// Move old coords into new set
+			coord_one_first_new.at<float>(i, 0) = coord_one_first_old.at<float>(i, 0);
+			coord_one_second_new.at<float>(i, 0) = coord_one_second_old.at<float>(i, 0);
+			coord_two_first_new.at<float>(i, 0) = coord_two_first_old.at<float>(i, 0);
+			coord_two_second_new.at<float>(i, 0) = coord_two_second_old.at<float>(i, 0);
+		}
+		for (int i = N_points; i < N_points + N; i++) {
+			// Move coord from new image into new set
+			coord_one_first_new.at<float>(i, 0) = coord_one.first.at<float>(i - N_points, 0);
+			coord_one_second_new.at<float>(i, 0) = coord_one.second.at<float>(i - N_points, 0);
+			coord_two_first_new.at<float>(i, 0) = coord_two.first.at<float>(i - N_points, 0);
+			coord_two_second_new.at<float>(i, 0) = coord_two.second.at<float>(i - N_points, 0);
+		}
+
+		N_points += N;
+
+	}
+
+
+	coord_one.first = coord_one_first_new;
+	coord_one.second = coord_one_second_new;
+	coord_two.first = coord_two_first_new;
+	coord_two.second = coord_two_second_new;
+	N = N_points;
+
+	cout << "valid objects found: " << N_points << endl;
+
+	// Initialize least squares variables: 
+	Mat x1(N, 1, CV_64FC1);
+	Mat y1(N, 1, CV_64FC1);
+	Mat x2(N, 1, CV_64FC1);
+	Mat y2(N, 1, CV_64FC1);
+
+	Mat d(2 * N, 1, CV_64FC1);
+
+	Mat g0(2 * N, 1, CV_64FC1);
+
+	Mat dg_dt(2 * N, 1, CV_64FC1);
+	Mat dg_dx(2 * N, 1, CV_64FC1);
+	Mat dg_dy(2 * N, 1, CV_64FC1);
+
+	Mat G(2 * N, 3, CV_64FC1);
+
+	double m_theta = -1.4968 * pi / 180;
+	double m_x = 0;// 370;
+	double m_y = 0;// -240;
+
+	Mat m(3, 1, CV_64FC1);
+	m.at<double>(0, 0) = m_theta;
+	m.at<double>(1, 0) = m_x;
+	m.at<double>(2, 0) = m_y;
+
+
+	// Move data into variables 
+	for (int i = 0; i < N; i++) {
+		x1.at<double>(i, 0) = (coord_one.first.at<float>(i, 0));
+		y1.at<double>(i, 0) = (coord_one.second.at<float>(i, 0));
+
+		x2.at<double>(i, 0) = (coord_two.first.at<float>(i, 0));
+		y2.at<double>(i, 0) = (coord_two.second.at<float>(i, 0));
+	}
+
+	// Apply lens correction to coordinates 
+	if (lensCorrection) {
+
+		double xt = 0;
+		double yt = 0;
+
+		for (int i = 0; i < N; i++) {
+			// Correction for set 1
+			xt = x1.at<double>(i, 0) - x_l0;
+			yt = y1.at<double>(i, 0) - y_l0;
+			yt = yt * dy / dx;
+
+			r = sqrt((xt - x_l0) * (xt - x_l0) + (yt - y_l0) * (yt - y_l0));
+			r = 1 + r * r * kappa;
+
+			x1.at<double>(i, 0) = xt * r + x_l0;
+			y1.at<double>(i, 0) = yt * r + y_l0 * dy / dx;
+
+
+			// Correction for set 2
+			xt = x2.at<double>(i, 0);
+			yt = y2.at<double>(i, 0);
+
+			r = sqrt((xt - x_l0) * (xt - x_l0) + (yt - y_l0) * (yt - y_l0));
+			r = 1.0 + r * r * kappa;
+
+			x2.at<double>(i, 0) = xt * r;
+			y2.at<double>(i, 0) = yt * r;
+		}
+
+
+	}
+
+	// Setup data vecter
+	for (int i = 0; i < 2 * N; i++) {
+		if (i < N) {
+			d.at<double>(i, 0) = x2.at<double>(i, 0);
+		}
+		else {
+			d.at<double>(i, 0) = y2.at<double>(i - N, 0);
+		}
+
+	}
+
+	float step = 0.1;
+	// Non linear least squares computation
+	for (int j = 0; j < 100; j++) {
+
+		// Calculate g0
+		for (int i = 0; i < 2 * N; i++) {
+			if (i < N) {
+				g0.at<double>(i, 0) = (x1.at<double>(i, 0) - m_x) * cos(m_theta) - (y1.at<double>(i, 0) - m_y) * sin(m_theta) + m_x;
+			}
+			else {
+				g0.at<double>(i, 0) = (x1.at<double>(i - N, 0) - m_x) * sin(m_theta) + (y1.at<double>(i - N, 0) - m_y) * cos(m_theta) + m_y;
+			}
+		}
+
+		// Calculate dg_dtheta, dg_dx0 and dg_dy0
+		for (int i = 0; i < 2 * N; i++) {
+			if (i < N) {
+				dg_dt.at<double>(i, 0) = -(x1.at<double>(i, 0) - m_x) * sin(m_theta) - (y1.at<double>(i, 0) - m_y) * cos(m_theta);
+				dg_dx.at<double>(i, 0) = 1 - cos(m_theta);
+				dg_dy.at<double>(i, 0) = sin(m_theta);
+			}
+			else {
+				dg_dt.at<double>(i, 0) = (x1.at<double>(i - N, 0) - m_x) * cos(m_theta) - (y1.at<double>(i - N, 0) - m_y) * sin(m_theta);
+				dg_dx.at<double>(i, 0) = -sin(m_theta);
+				dg_dy.at<double>(i, 0) = 1 - cos(m_theta);
+			}
+		}
+
+		// Values into G
+		G.col(0) = (dg_dt + 0);
+		G.col(1) = (dg_dx + 0);
+		G.col(2) = (dg_dy + 0);
+
+		m = m + step * ((G.t() * G).inv()) * G.t() * (d - g0);
+
+		// cout << "G.Gt() inv: " << endl << ((G * G.t()).inv()).size() << endl;
+
+		
+		if (abs(m_x - m.at<double>(1, 0)) / (m.at<double>(1, 0)) < 1e-9) {
+
+			m_theta = m.at<double>(0, 0);
+			m_x = m.at<double>(1, 0);
+			m_y = m.at<double>(2, 0);
+
+			cout << "broke at itteration: " << j << endl;
+
+			break;
+		}
+		
+
+		m_theta = m.at<double>(0, 0);
+		m_x = m.at<double>(1, 0);
+		m_y = m.at<double>(2, 0);
+
+	}
+
+	parameters[0] = m.at<double>(1, 0);
+	parameters[1] = m.at<double>(2, 0);
+	parameters[2] = m.at<double>(0, 0);
+
+
+	// Print parameters to console
+	cout << "rotation parameters: (" << parameters[0] << ", " << parameters[1] << ", " << parameters[2] * 180 / pi << ") " << endl;
+	cout << endl;
+
+	return parameters;
+	 
 }
