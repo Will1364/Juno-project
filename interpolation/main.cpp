@@ -8,7 +8,7 @@ bool lensCorr = true;
 parameters = coordinateLSQ(img);
 if (parameters[0] == 0) {
     // Default paramters if LSQ doesnt work
-    parameters = { 373.468, -240.483, -float(1.50362 * pi / 180) };
+    parameters = { 376, -240, -float(1.4968 * pi / 180.0) };
 }
     
 // Simple image rotation
