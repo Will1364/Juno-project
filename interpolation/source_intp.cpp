@@ -37,9 +37,9 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 
 	// Variables : 
 	int search = 50;		// NxN search area around each pixel. 50 is a good balance between compute time and extra buffer 
-	int padding = 0;		// Number of pixels to remove from the border. 
-	float max_dist = 1.5;	// The furthest away 'closest' pixel can be 
-	float min_dist = 0.05;  // If min distance is closer than this, uses uninterpolated value. Set to zero or negative to disable
+	int padding = 2;		// Number of lines in original image to not include
+	float max_dist = 1.2;	// The furthest away 'closest' pixel can be 
+	float min_dist = 0.01;  // If min distance is closer than this, uses uninterpolated value. Set to zero or negative to disable
 
 	// Parameter setup
 	int width = img.cols;
@@ -63,6 +63,7 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 	double tmp = 0;
 
 	Mat interpolated(height_i, width_i, CV_8UC1);
+	interpolated = 0; 
 
 	// Bellow are 'niceness' parameters, used for debugging / to track progress
 	Mat vals_used(height, width, CV_8UC1);		// Mat used to display pixels used. Can be commented out without affecting the interpolation
@@ -74,8 +75,8 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 	int count_mindist = 0;
 
 	// Lens correction
-	int x_l0 = 383;				// Lens center (from Matlab script)
-	int y_l0 = 257;
+	int x_l0 = 383 - border_pad;		// Lens center (from Matlab script)
+	int y_l0 = 257 - border_pad;
 
 	// Interpolation function
 	cout << "interpolating";
@@ -92,8 +93,8 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 			}
 
 			// Search center coordinate (in input image)  
-			s_y = i + padding - (search / 2); // -y_l0 * lensCorrection;
-			s_x = j + padding - (search / 2); // -x_l0 * lensCorrection;
+			s_y = i - (search / 2); // -y_l0 * lensCorrection;
+			s_x = j - (search / 2); // -x_l0 * lensCorrection;
 
 			// Fills search window with distance to point in a search x search grid around 
 			// Finds nearest arr_size values within search window 
@@ -101,7 +102,7 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 				for (int l = 0; l < search; l++) {
 
 					// Test if search coordinate is within input image 
-					if (s_y + k > 0 and s_y + k < height and s_x + l > 0 and s_x + l < width) {
+					if (s_y + k > padding and s_y + k < height - padding and s_x + l > padding and s_x + l < width - padding) {
 
 						// Calculate distance
 						dist = sqrt(pow(img.at<Vec3d>(s_y + k, s_x + l)[0] - (j - x_l0 * lensCorrection), 2) + pow(img.at<Vec3d>(s_y + k, s_x + l)[1] - (i - y_l0 * lensCorrection), 2));
@@ -199,8 +200,8 @@ Mat interpolateNN(Mat img, int arr_size, bool lensCorrection) {
 	// Output text at function end 
 	cout << "\rinterpolated                       " << endl;
 	cout << "fraction used from each segment: " << float(used) / (height_i * width_i) << endl;
-	cout << "fraction unused: " << float(unused) / (height_i * width_i) << endl << endl;
-	cout << "Number of pixels closer than min_dist (" << min_dist << "): " << count_mindist << endl;
+	cout << "fraction unused: " << float(unused) / (height_i * width_i) << endl;
+	cout << "fraction closer than min_dist (" << min_dist << "): " << float(count_mindist) / (height_i * width_i) << endl;
 	cout << endl;
 
 	return interpolated;
