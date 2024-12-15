@@ -20,14 +20,13 @@ Mat img_shift = imShiftSimple(img, parameters);
 // Interpolation
 Mat img_coord = imShiftCoord(img, parameters, lensCorr);
 Mat img_intp = interpolateNN(img_coord, 4, lensCorr);
-//Mat img_intp = imread("intp_tmp.png", IMREAD_GRAYSCALE);
-imwrite("intp_tmp.png", img_intp);  // Save file for quick load when testing other functions 
+imwrite("intp_tmp.png", img_intp * 255.0);  // Save file for quick load when testing other functions 
 
 // Print flux values of objects in image
-blobFlux(img_intp, 40, 15);
+blobFlux(img_intp, 40/255.0, 15/255.0);
 
 // Intensity plot of given coordinate (x,y)
 intensityPlot(img_intp, 498, 304);
 
 // Create upscaled version of star (~260 * 260 image)
-Mat img_starScaled = starPlot(img_intp, 189, 407, 8);
+Mat img_starScaled = starPlot(img_intp, 183, 401, 10);
