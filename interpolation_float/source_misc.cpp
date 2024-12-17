@@ -7,6 +7,8 @@
 
 // Constants
 const double pi = 3.14159265358979;
+const int border_pad = 0;					// Number of rows/columns removed (left side and top)
+
 
 // Split image
 pair<Mat, Mat> splitBinary(Mat img, int threshold);
@@ -17,10 +19,9 @@ Mat erodeLR(Mat img);
 
 // Image shifting
 Mat imShiftSimple(Mat img, array<float, 3> rot_prm);
-Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection);     // Creates a 3d array with [x,y,val] along the 3rd axis
+Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection);     // Creates a 3d array with [x,y,val] channels
+Mat imShiftCoordAng(Mat img);
 
-// Figures
-void intensityPlot(Mat img, int x_peak, int y_peak);
 
 // Other functions
 pair<Mat, Mat> blobCoordinates(Mat img);
@@ -406,6 +407,105 @@ Mat imShiftCoord(Mat img, array<float, 3> rot_prm, bool lensCorrection) {
 	return img_shift;
 }
 
+
+Mat imShiftCoordAng(Mat img) {
+	// Used to determine despinned/rotated image coordinates
+	// Creates a Mat object with [rho, theta, val]. For use with angular interpolation function. 
+	// 
+	
+
+	// Lens correction parameters
+	float dx = 8.6;			// Physical pixel size [µm]
+	float dy = 8.3;
+
+	float pix_ratio = dy / dx; // Pixel ratio
+
+	int x_l0 = 383 - border_pad;			// Radial distortion center (from Matlab script)
+	int y_l0 = 257 - border_pad;
+
+	double efl = 20006;		// Effective focal length
+	double kappa = 3.3e-08; // Radial distortion correction 
+
+	double f = efl / dx;	// focal length
+
+	double r = 0;
+
+
+	// Parameters
+
+
+	float xt = 0;							// Temporary coord
+	float yt = 0;
+
+	int width = img.cols;					// Parameter setup
+	int height = img.rows;
+
+
+	Mat vec(1, 3, CV_64FC1);
+	vec = 0;
+
+	Mat R_fSC = eulerRot(1, 2, 3, 167.387, 0.4255, -0.3141, true);
+	Mat R_fF = eulerRot(3, 3, 3, 1.4968 * pi / 180, 0, 0);
+
+	Mat img_shift(height, width, CV_64FC3);
+
+	// Rotation of the coordinates
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+
+			xt = j;
+			yt = i;
+
+			// Radial lens correction
+			xt -= x_l0;
+			yt -= y_l0;
+
+			yt = yt * dy / dx;
+
+			r = sqrt(xt * xt + yt * yt);
+			r = 1 + r * r * kappa;
+
+			xt = xt * r / f;
+			yt = yt * r / f;
+
+			// CCD coordinates
+			r = sqrt(xt * xt + yt * yt + 1);
+			xt = xt / r;
+			yt = yt / r;
+
+			vec.at<double>(0, 0) = xt;
+			vec.at<double>(0, 1) = yt;
+			vec.at<double>(0, 2) = 1 / r;
+
+
+
+			if (i % 2 == 1) {
+
+				vec = (vec * R_fSC) * R_fF;
+
+			}
+
+			else if (i % 2 == 0) {
+				
+				vec = vec * R_fSC;
+
+			}
+
+			img_shift.at<Vec3d>(i, j)[0] = (atan2(vec.at<double>(0 ,1), vec.at<double>(0,0)));			// theta
+			img_shift.at<Vec3d>(i, j)[1] = (acos(-vec.at<double>(0, 2)));								// rho 
+			img_shift.at<Vec3d>(i, j)[2] = (img.at<float>(i, j));
+			
+
+		}
+
+	}
+
+	// Returns image with channels [x, y, z] 
+	return img_shift;
+}
+
+
+
 pair<Mat, Mat> blobCoordinates(Mat img, float threshold) {
 	// Finds blobs (stars) and determines their center coordinate and area. Returns list of coordinates (x, y). 
 	// Does simple errosion/dilation to remove noise/combine stripes to full stars, 
@@ -664,7 +764,7 @@ pair<Mat, Mat> blobCoordinates(Mat img, float threshold) {
 					}
 
 
-					cout << "[x,y]: " << (x_pos.at<float>(count, 0)) << ", " << (y_pos.at<float>(count, 0)) << ", area: " << area << endl;
+					// cout << "[x,y]: " << (x_pos.at<float>(count, 0)) << ", " << (y_pos.at<float>(count, 0)) << ", area: " << area << endl;
 
 					count++;
 					if (count == count_max) {
@@ -1202,22 +1302,22 @@ array<float, 3> coordinateLSQ(Mat img, bool lensCorrection) {
 			yt = y1.at<float>(i, 0) - y_l0;
 			yt = yt * dy / dx;
 
-			r = sqrt((xt - x_l0) * (xt - x_l0) + (yt - y_l0) * (yt - y_l0));
+			r = sqrt((xt) * (xt) + (yt) * (yt));
 			r = 1 + r * r * kappa;
 
-			x1.at<float>(i, 0) = xt * r + x_l0;
-			y1.at<float>(i, 0) = yt * r + y_l0 * dy / dx;
+			x1.at<float>(i, 0) = xt * r; //+ x_l0;
+			y1.at<float>(i, 0) = yt * r; //+ y_l0 * dy / dx;
 
 
 			// Correction for set 2
 			xt = x2.at<float>(i, 0);
 			yt = y2.at<float>(i, 0);
 
-			r = sqrt((xt - x_l0) * (xt - x_l0) + (yt - y_l0) * (yt - y_l0));
+			r = sqrt((xt) * (xt) + (yt) * (yt));
 			r = 1 + r * r * kappa;
 
-			x2.at<float>(i, 0) = xt * r;
-			y2.at<float>(i, 0) = yt * r;
+			x2.at<float>(i, 0) = xt * r; //+ x_l0;
+			y2.at<float>(i, 0) = yt * r; //+ y_l0 * dy / dx;
 		}
 
 
@@ -1325,15 +1425,15 @@ Mat eulerRot(int ax1, int ax2, int ax3, float ang1, float ang2, float ang3, bool
 	}
 
 	// Create empty matrix
-	Mat Rot(3, 3, CV_32FC1);
-	Mat tmp(3, 3, CV_32FC1);
+	Mat Rot(3, 3, CV_64FC1);
+	Mat tmp(3, 3, CV_64FC1);
 
 	Rot = 0;
 	tmp = 0;
 
 	// add ones to the diagonal: 
 	for (int i = 0; i < 3; i++) {
-		Rot.at<float>(i, i) = 1;
+		Rot.at<double>(i, i) = 1;
 	}
 
 	// Calculate rotation matrix
@@ -1343,25 +1443,25 @@ Mat eulerRot(int ax1, int ax2, int ax3, float ang1, float ang2, float ang3, bool
 
 		// Calculate individual roation
 		if (ax[i] == 1) {
-			tmp.at<float>(0, 0) = 1;
-			tmp.at<float>(1, 1) = c;
-			tmp.at<float>(1, 2) = s;
-			tmp.at<float>(2, 1) = -s;
-			tmp.at<float>(2, 2) = c;
+			tmp.at<double>(0, 0) = 1;
+			tmp.at<double>(1, 1) = c;
+			tmp.at<double>(1, 2) = s;
+			tmp.at<double>(2, 1) = -s;
+			tmp.at<double>(2, 2) = c;
 		}
 		else if (ax[i] == 2) {
-			tmp.at<float>(0, 0) = c;
-			tmp.at<float>(0, 2) = -s;
-			tmp.at<float>(1, 1) = 1;
-			tmp.at<float>(2, 0) = s;
-			tmp.at<float>(2, 2) = c;
+			tmp.at<double>(0, 0) = c;
+			tmp.at<double>(0, 2) = -s;
+			tmp.at<double>(1, 1) = 1;
+			tmp.at<double>(2, 0) = s;
+			tmp.at<double>(2, 2) = c;
 		}
 		else if (ax[i] == 3) {
-			tmp.at<float>(0, 0) = c;
-			tmp.at<float>(0, 1) = s;
-			tmp.at<float>(1, 0) = -s;
-			tmp.at<float>(1, 1) = c;
-			tmp.at<float>(2, 2) = 1;
+			tmp.at<double>(0, 0) = c;
+			tmp.at<double>(0, 1) = s;
+			tmp.at<double>(1, 0) = -s;
+			tmp.at<double>(1, 1) = c;
+			tmp.at<double>(2, 2) = 1;
 		}
 
 		// Add to Rot matrix and reset tmp
@@ -1370,14 +1470,16 @@ Mat eulerRot(int ax1, int ax2, int ax3, float ang1, float ang2, float ang3, bool
 
 	}
 
-	// Check and remove really small values (usually rounding errors
+	// Check for and remove really small values (usually rounding errors
+	/*
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
-			if (abs(Rot.at<float>(i, j)) < 1e-6) {
-				Rot.at<float>(i, j) = 0;
+			if (abs(Rot.at<double>(i, j)) < 1e-6) {
+				Rot.at<double>(i, j) = 0;
 			}
 		}
 	}
+	*/
 
 	return Rot;
 }
