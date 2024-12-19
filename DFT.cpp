@@ -406,15 +406,59 @@ Mat fourier(const Mat& OGImage) {
 	
 	idft(complexImage, complexImage, DFT_SCALE | DFT_REAL_OUTPUT); 
 	
-	normalize(complexImage, recImage, 0, 1, NORM_MINMAX); 
+	minMaxLoc(complexImage, &minVal, &maxVal, &minLoc, &maxLoc);
+	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
+
+	//normalize(complexImage, recImage, OGmin, OGmax, NORM_MINMAX, CV_8U);
 	
-	recImage = recImage.colRange(hBorder, cols + hBorder);
-	recImage = recImage.rowRange(vBorder, rows + vBorder);
-	
-	if (analysis == 1){
-		imshow("Reconstructed Image (IDFT)", recImage);
-		waitKey(); 
+	int myCount0 = 0;
+	int myCount255 = 0;
+
+
+	for (int i = 0; i < (cols + 2 * hBorder); i++) {
+		for (int j = 0; j < (rows + 2 * vBorder); j++) {
+			if (complexImage.at<float>(j, i) < 0) {
+				complexImage.at<float>(j, i) = 0;
+				myCount0 ++;
+			}
+			else if (complexImage.at<float>(j, i) > 255) {
+				complexImage.at<float>(j, i) = 255;
+				myCount255 ++;
+			}
+		}
 	}
 
-	return recImage;
+	cout << "myCount0: " << myCount0 << "  myCount255: " << myCount255 << "\n";
+
+	complexImage.convertTo(recImage, CV_8U);
+	
+	if (padding == "old version") {
+		recImage = recImage.colRange(0, cols); 
+		recImage = recImage.rowRange(0, rows); 
+	}
+	else {
+		recImage = recImage.colRange(hBorder, cols + hBorder); 
+		recImage = recImage.rowRange(vBorder, rows + vBorder); 
+	}
+
+	Mat Residuals;
+	
+
+	Residuals = OGImage - recImage; 
+	//Residuals = Residuals(Range(15, 400), Range(15, 400));
+
+
+	minMaxLoc(Residuals, &minVal, &maxVal, &minLoc, &maxLoc);
+	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
+
+	Residuals = Residuals * (255 / maxVal);
+
+	imwrite("Residuals_2f.png", Residuals);
+
+  	//imshow("Reconstructed Image (IDFT)", recImage);
+	imwrite("recImage_2f.png", recImage); 
+
+
+	imshow("Residuals", Residuals);
+	return complexImage;
 }
