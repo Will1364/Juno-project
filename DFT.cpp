@@ -30,8 +30,8 @@ Mat fourier(const Mat& OGImage) {
 	vector<int> fList = { 307, 230 }; 
 	// list of known frequencies to be removed in the manual setting
 
-	int interval = 0; 
-	// half the interval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
+	int vvInterval = 0; 
+	// half the vInterval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
 
 	
 	const int halfFilterWidth = 60;  // controls width of gaussian filter
@@ -193,8 +193,8 @@ Mat fourier(const Mat& OGImage) {
 	//cout << maxLoc.x << "\n";
 	int diff = xCenter - maxLoc.x;
 	
-	mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0 
-	mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
+	mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0 
+	mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
 
 	if (analysis == 1){
 		imshow("filterd fourier image", mag);
@@ -210,20 +210,20 @@ Mat fourier(const Mat& OGImage) {
 			int diff = xCenter - maxLoc.x;
 			//complexImage(Range(yCenter, yCenter + yCenter), Range(xCenter + ndiff - 5, xCenter + ndiff + 5)) = 0; // target oscilation is set to 0 
 			//complexImage(Range(yCenter, yCenter + yCenter), Range(xCenter - ndiff - 5, xCenter - ndiff + 5)) = 0;  
-			complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0  
-			complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
-			mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0   
-			mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
+			complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0  
+			complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
+			mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0   
+			mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
 		
 			complexImage = swapQuadrants(complexImage); 
 		}
 		else if (manual == true) {
 			for (int i = 0; i < fList.size(); i++) {
 				int diff = xCenter - fList[i];
-				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0   
-				complexImage(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0; 
-				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0    
-				mag(Range(yCenter - interval, yCenter + interval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0;  
+				complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0   
+				complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0; 
+				mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0    
+				mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - halfFilterWidth, xCenter - diff + halfFilterWidth)) = 0;  
 			}
 			complexImage = swapQuadrants(complexImage); 
 		}
@@ -244,7 +244,7 @@ Mat fourier(const Mat& OGImage) {
 		split(complexImage, channels);
 		if (manual == false) {
 			int diff = xCenter - maxLoc.x;
-			for (int i = 0; i <= interval; i++) {
+			for (int i = 0; i <= vInterval; i++) {
 
 				mag.at<float>(yCenter + i, xCenter + diff) = 0;
 				mag.at<float>(yCenter - i, xCenter + diff) = 0;
@@ -319,7 +319,7 @@ Mat fourier(const Mat& OGImage) {
 			for (int k = 0; k < fList.size(); k++) {
 				int diff = xCenter - fList[k];
 		
-				for (int i = 0; i <= interval; i++) {
+				for (int i = 0; i <= vInterval; i++) {
 					mag.at<float>(yCenter + i, xCenter + diff) = 0;
 					mag.at<float>(yCenter - i, xCenter + diff) = 0;
 					mag.at<float>(yCenter + i, xCenter - diff) = 0;
