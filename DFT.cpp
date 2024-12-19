@@ -14,12 +14,12 @@
 Mat fourier(const Mat& OGImage) {
 	// -------settings-------------------------------------------------
 	
-	int mode = 0; 
+	int mode = 1; 
 	// 0 for just setting oscillation frequency to 0 
 	// 1 for gaussian 
 
-	string padding = "clamp";
-	// options for padding are: "zeros", "clamp", "mirror", "wrap"
+	string padding = "mirror";
+	// options for padding are: "zeros", "clamp", "mirror", "wrap", "old version"
 	
 	int analysis = 0; 
 	// if you want to see the magnitude profile and images set to 1
@@ -27,15 +27,15 @@ Mat fourier(const Mat& OGImage) {
 	int manual = true; 
 	// set to false if you want the program to automatically detect the highest non-dc oscillation and remove it
 	
-	vector<int> fList = { 307, 230 }; 
+	vector<int> fList = {307, 230, 153}; 
 	// list of known frequencies to be removed in the manual setting
 
 	int vvInterval = 0; 
 	// half the vInterval width to be removed in y-direction is defined (Set to 0 for just changing values at the x-axis)
 
 	
-	const int halfFilterWidth = 60;  // controls width of gaussian filter
-	const int cutoff =  20;		// controls agressiveness of gaussian filter
+	const int halfFilterWidth = 30;  // controls width of gaussian filter
+	const int cutoff =  10;		// controls agressiveness of gaussian filter
 	
 	// ------- program -----------------------------------------------------
 	
@@ -75,6 +75,12 @@ Mat fourier(const Mat& OGImage) {
 	}
 	else if (padding == "wrap") {
 		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_WRAP);
+	}
+	else if (padding == "old version") {
+		Mat zeroRow = Mat::zeros(desiredRows - rows, cols, OGImage.type()); 
+		vconcat(OGImage, zeroRow, paddedImage); 
+		Mat zeroCol = Mat::zeros(paddedImage.rows, desiredCols - cols, OGImage.type());   
+		hconcat(paddedImage, zeroCol, paddedImage); 
 	}
 	else {
 		cout << "No valid padding is chosen" << "\n";
