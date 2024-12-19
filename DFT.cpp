@@ -410,7 +410,7 @@ Mat fourier(const Mat& OGImage) {
 	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
 
 	//normalize(complexImage, recImage, OGmin, OGmax, NORM_MINMAX, CV_8U);
-	
+
 	int myCount0 = 0;
 	int myCount255 = 0;
 
@@ -419,46 +419,53 @@ Mat fourier(const Mat& OGImage) {
 		for (int j = 0; j < (rows + 2 * vBorder); j++) {
 			if (complexImage.at<float>(j, i) < 0) {
 				complexImage.at<float>(j, i) = 0;
-				myCount0 ++;
+				myCount0++;
 			}
 			else if (complexImage.at<float>(j, i) > 255) {
 				complexImage.at<float>(j, i) = 255;
-				myCount255 ++;
+				myCount255++;
 			}
 		}
 	}
 
+	complexImage.copyTo(recImage);
+	
+	
+	
 	cout << "myCount0: " << myCount0 << "  myCount255: " << myCount255 << "\n";
-
-	complexImage.convertTo(recImage, CV_8U);
+	
 	
 	if (padding == "old version") {
-		recImage = recImage.colRange(0, cols); 
-		recImage = recImage.rowRange(0, rows); 
+		recImage = recImage.colRange(0, cols);
+		recImage = recImage.rowRange(0, rows);
 	}
 	else {
-		recImage = recImage.colRange(hBorder, cols + hBorder); 
-		recImage = recImage.rowRange(vBorder, rows + vBorder); 
+		recImage = recImage.colRange(hBorder, cols + hBorder);
+		recImage = recImage.rowRange(vBorder, rows + vBorder);
 	}
-
-	Mat Residuals;
 	
-
-	Residuals = OGImage - recImage; 
+	
+	
+	Mat Residuals;
+	Mat OGImage2;
+	OGImage.copyTo(OGImage2);
+	OGImage2.convertTo(OGImage2, CV_32FC1);
+	
+	Residuals = OGImage2 - recImage;
 	//Residuals = Residuals(Range(15, 400), Range(15, 400));
-
-
+	
+	
 	minMaxLoc(Residuals, &minVal, &maxVal, &minLoc, &maxLoc);
 	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
-
+	
 	Residuals = Residuals * (255 / maxVal);
-
+	
 	imwrite("Residuals_2f.png", Residuals);
-
-  	//imshow("Reconstructed Image (IDFT)", recImage);
-	imwrite("recImage_2f.png", recImage); 
-
-
-	imshow("Residuals", Residuals);
-	return complexImage;
+	
+	//imshow("Reconstructed Image (IDFT)", recImage);
+	imwrite("recImage_2f.png", recImage);
+	
+	
+	imshow("Residuals", abs(Residuals / 255.0));
+	return recImage / 255.0;
 }
