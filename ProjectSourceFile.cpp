@@ -4,11 +4,11 @@ Mat RemoveSmallParticleNoise(Mat image) {
 	
 	//Make a copy of the existing image to compare to the original
 	Mat image2 = image.clone();
-	copyMakeBorder(image2, image2, 2, 2, 1, 1, BORDER_CONSTANT, Scalar(0, 0, 0));
+	copyMakeBorder(image2, image2, 2, 2, 1, 1, BORDER_CONSTANT, Scalar(0, 0, 0)); 
 
 	//Set some threshold values
-	int t1 = 30; //Sets the difference between a pixel and its imidiate neighbour - 35 works best for the unscaled images
-	int t2 = 2; //Sets the difference between the 2 neighbours of a pixel
+	int t1 = 55; //Sets the difference between a pixel and its imidiate neighbour 
+	int t2 = 8; //Sets the difference between the 2 neighbours of a pixel
 
 	int width = image2.cols;
 	int height = image2.rows;
@@ -36,7 +36,7 @@ Mat RemoveSmallParticleNoise(Mat image) {
 				}
 				else {
 					if (j == 1) { image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1)) / 4; }
-					else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i-2, j + 1) + image2.at<uchar>(i - 2,j))/ 3;// + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i + 2, j - 1)) / 7;
+					else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i-2, j + 1) + image2.at<uchar>(i - 2,j))/ 3;
 
 					image2.at<uchar>(i, j + 1) = image2.at<uchar>(i, j);
 				}
@@ -54,12 +54,6 @@ Mat RemoveSmallParticleNoise(Mat image) {
 				}
 				else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i - 2, j)) / 3;
 			}
-			//else if ((image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j +2)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
-				//if (j == 1) {
-					//image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
-				//}
-				//else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j - 1) + image2.at<uchar>(i + 2, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j)) / 5;
-			//}
 
 			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) {
 				if (j == 1) {
@@ -84,12 +78,6 @@ Mat RemoveSmallParticleNoise(Mat image) {
 				image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i, j + 2) / 2);
 			}
 			
-			//else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i + 2, j + 2)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i - 2, j + 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i-2, j - 1)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
-				//if (j == 1) {
-					//image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
-				//}
-				//else image2.at<uchar>(i, j) = (image2.at<uchar>(i, j - 1) + image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1)) / 4;
-			//}
 			else if (j <= width - 2 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j - 1)) >= t1 && (image2.at<uchar>(i, j) - image2.at<uchar>(i, j +2)) >= t1 && (image2.at<uchar>(i, j - 1) - image2.at<uchar>(i, j + 1) <= t2)) { //her
 				if (j == 1) {
 					image2.at<uchar>(i, j) = (image2.at<uchar>(i - 2, j) + image2.at<uchar>(i + 2, j) + image2.at<uchar>(i + 2, j + 1) + image2.at<uchar>(i - 2, j + 1) + image2.at<uchar>(i, j + 1)) / 5;
@@ -98,14 +86,10 @@ Mat RemoveSmallParticleNoise(Mat image) {
 			}
 
 		}
-	}
-	if ((image2.at<uchar>(355, 54) - image2.at<uchar>(355, 56)) > 2) {
-		cout << "hiiii" << endl;
-	}
-	cout << (image2.at<uchar>(355, 54) - image2.at<uchar>(355, 56)) << endl;
-	cout << "hi" << endl; 
+	} 
 	image2 = image2.rowRange(2, image2.rows - 2).colRange(1, image2.cols - 1);
 	
+	//If desired show image depicting residuals
 	Mat ImDif;
 	absdiff(image, image2, ImDif);
 
@@ -114,7 +98,7 @@ Mat RemoveSmallParticleNoise(Mat image) {
 	/*namedWindow("Dif", WINDOW_NORMAL);
 	resizeWindow("Dif", image2.rows * 2, image2.cols * 2);
 	imshow("Dif", ImDif);
-	waitKey(0);*/
+	waitKey(0);
 
 	namedWindow("Original image", WINDOW_NORMAL);
 	resizeWindow("Original image", image2.rows * 2, image2.cols * 2);
@@ -124,145 +108,74 @@ Mat RemoveSmallParticleNoise(Mat image) {
 	namedWindow("New image", WINDOW_NORMAL);
 	resizeWindow("New image", image2.rows * 2, image2.cols * 2);
 	imshow("New image", image2);
-	waitKey(0);
+	waitKey(0);*/
 
 
 	return image2;
 }
-//Failed script
-/*Mat RemoveLargeParticleNoise(Mat image) {
-	//image.convertTo(image, CV_32FC1);
-	Mat imagex=image.clone();
-	Mat imagex2 = imagex.clone();
-	cout << "here" << endl;
-
-	int width = imagex.cols;   // Image width
-	int height = imagex.rows;  // Image height
-
-	for (int i = 2; i < height - 2; i++) {
-		for (int j = width - 2; j >1; j--) {
-			//cout << "here" << endl;
-			imagex.at<uchar>(i, j) = (image.at<uchar>(i, j-1) - image.at<uchar>(i, j))/60;
-		}
-	}
-
-	//threshold(imagex, imagex, 2, 255, THRESH_BINARY);
-
-	imshow("1derv", imagex);
-	waitKey(0);
-
-	/*for (int i = 2; i < height - 2; i++) {
-		for (int j = 2; j < width - 1; j++) {
-			imagex2.at<float>(i, j) = (imagex.at<float>(i, j) - imagex.at<float>(i, j - 1))/100;
-		}
-	}
-
-	imshow("2derv", imagex2);
-	waitKey(0);
-
-
-	/*int Hm = 400;
-	unsigned char value = 0; // index value for the histogram
-	int histogram[400]; // histogram array -remember to set to zero initially
-	
-	int k = Hm;
-	while (k-- > 0) {
-		histogram[k] = 0; // reset histogram entry
-	}
-	for (int i = 2; i < height-2; i++) {
-		for (int j = 1; j < width-1; j++) {
-			value = imagex.at<float>(i, j); //uchar is used for single-channel pixels
-			//value = image.at<Vec3b>(i, j) [channel] ;
-				//cout << value << endl;
-			histogram[value] += 1;
-
-		}
-	}
-
-
-	int bin_w = cvRound((double)width / Hm);
-	Mat histImage(height, width, CV_8UC1, Scalar(255, 255, 255));
-	//Mat histogram;
-
-	//normalize(image, , 0, histImage.rows, NORM_MINMAX, -1, Mat());
-
-
-	float maxVal = *max_element(histogram, histogram + Hm); // Find max value in array
-	for (int i = 0; i < Hm; i++) {
-		histogram[i] = (histogram[i] / maxVal) * height;  // Scale values to fit the image height
-	}
-
-
-	for (int i = 1; i < Hm; i++) {
-		line(histImage, Point(bin_w * (i - 1), height - cvRound(histogram[i - 1])),
-			Point(bin_w * i, height - cvRound(histogram[i])),
-			Scalar(0, 0, 0), 2, 8, 0);  // Draw lines in black
-	}
-	namedWindow("Histogram", WINDOW_NORMAL);
-	resizeWindow("Histogram", 600, 600);
-	imshow("Histogram", histImage);
-
-	waitKey(0);
-
-	threshold(imagex, imagex, 100, 400, THRESH_BINARY);
-	imshow("imagex2Bin", imagex);
-	waitKey(0);
-
-	return imagex;
-}*/ 
 
 
 //Remove the light column by comparing median of columns and local medians in 1 single image
-//produced too much noise
 Mat RemoveLightEdge(Mat image) { 
+	//Make a copy of the image to work with
 	Mat image2 = image.clone();
 
 	int width = image2.cols;
 	int height = image2.rows;
 	int n = 0;
 
+	//Create array of pixel values in the last column
 	vector<float> col;
 	for (int i = 0; i < height; i++) {
 		col.push_back(image2.at<uchar>(i, width-1));
 		n++;
-		//cout << i << "   " << col[i] << endl;
 	}
+	//Find the median of the last column
+	//Sort array values
+	sort(col.begin(), col.end()); 
+	//Find middle value
+	float med=(col[n / 2]); 
 
-	sort(col.begin(), col.end());
-	float med=(col[n / 2]);
-
+	//create empty array for median errors for column groups
 	vector<float> colerr;
 	n = 0;
-	int step = 2;
-	vector<float> corr;
+	//The half-size of the compare pixelcluster
+	int step =3;
+	//create empty array for median errors for local groups
+	vector<float> locerr;
 	int m = 0;
 
+	//Go through every pixel in the image coumnwise
 	for (int j =step;j<width-1; j = j + step * 2) {
 		for (int i = step; i < height-1; i=i+step*2) {
+			//For every pixel loop through the neighbour cluster
 			for (int k = i - step; k < i + step; k++) {
 				for (int l = j - step; l < j + step; l++) {
 					colerr.push_back(image2.at<uchar>(k, l) - med);
-					corr.push_back(image2.at<uchar>(k, l) - med);
+					locerr.push_back(image2.at<uchar>(k, l) - med);
 					n++;
 					m++;
 				}
 			}
+			//Find median for the column groups and the local groups
 			sort(colerr.begin(), colerr.end());
-			sort(corr.begin(), corr.end());
+			sort(locerr.begin(), locerr.end());
 			float medErr = colerr[n / 2];
-			float corErr = corr[m / 2];
+			float locErr = locerr[m / 2];
 
+			//For every pixel loop through the neighbour cluster again
 			for (int k = i - step; k < i + step; k++) {
 				for (int l = j - step; l < j + step; l++) {
-					//image2.at<uchar>(k, l) = saturate_cast<uchar>(image2.at<uchar>(k, l) - medErr);
+					//To avoid overcorrection, the limit for using column median is set to 15 below the median of the noise-free column
 					if (image2.at<uchar>(k, l) - medErr >= med - 15) {
 						image2.at<uchar>(k, l) = saturate_cast<uchar>(image2.at<uchar>(k, l) - medErr);
 					}
+					//If the image is overcorrected, the local median is used instead
 					else {
-						image2.at<uchar>(k, l) = saturate_cast<uchar>(image2.at<uchar>(k, l) - corErr);
+						image2.at<uchar>(k, l) = saturate_cast<uchar>(image2.at<uchar>(k, l) - locErr);
 					}
 					m = 0;
-					corr.clear();
+					locerr.clear();
 
 				}
 			}
@@ -278,53 +191,6 @@ Mat RemoveLightEdge(Mat image) {
 	return image2;
 }
 
-/*Mat MakeHistogram(Mat image) {
-	int width = image.cols;   // Image width
-	int height = image.rows;  // Image height
-	int Hm = 256;
-	unsigned char value = 0; // index value for the histogram
-	int histogram[256]; // histogram array -remember to set to zero initially
-
-	int k = Hm;
-	while (k-- > 0) {
-		histogram[k] = 0; // reset histogram entry
-	}
-	for (int i = 2; i < height - 2; i++) {
-		for (int j = 1; j < width - 1; j++) {
-			value = image.at<uchar>(i, j); //uchar is used for single-channel pixels
-			//value = image.at<Vec3b>(i, j) [channel] ;
-				//cout << value << endl;
-			histogram[value] += 1;
-
-		}
-	}
-
-
-	int bin_w = cvRound((double)width / Hm);
-	Mat histImage(height, width, CV_8UC1, Scalar(255, 255, 255));
-	//Mat histogram;
-
-	//normalize(image, , 0, histImage.rows, NORM_MINMAX, -1, Mat());
-
-
-	float maxVal = *max_element(histogram, histogram + Hm); // Find max value in array
-	for (int i = 0; i < Hm; i++) {
-		histogram[i] = (histogram[i] / maxVal) * height;  // Scale values to fit the image height
-	}
-
-
-	for (int i = 1; i < Hm; i++) {
-		line(histImage, Point(bin_w * (i - 1), height - cvRound(histogram[i - 1])),
-			Point(bin_w * i, height - cvRound(histogram[i])),
-			Scalar(0, 0, 0), 2, 8, 0);  // Draw lines in black
-	}
-	namedWindow("Histogram", WINDOW_NORMAL);
-	resizeWindow("Histogram", 600, 600);
-	imshow("Histogram", histImage);
-
-	waitKey(0);
-	return histImage;
-}*/
 
 //comparison of profiles in graphs (not important)
 Mat AnalyzeLight(Mat image) {
@@ -417,12 +283,38 @@ Mat MedianFilter(Mat image) {
 	//It also works, but make the stars "fuzzier"
 	Mat image2 = image.clone();
 	//medianBlur(image, image2, 3);
-	GaussianBlur(image, image2, Size(9, 9), 0);
+	//GaussianBlur(image, image2, Size(9, 9), 0);
 
-	namedWindow("New image2", WINDOW_NORMAL);
+	//Create emtpy array
+	vector<float> medKern;
+	int width = image2.cols;
+	int height = image2.rows;
+	int n = 0;
+	int halfKernSize = 1;
+	//Loop through the image
+	for (int i = halfKernSize; i < height - halfKernSize; i++) {
+		cout << i << endl;
+		for (int j = halfKernSize; j < width - halfKernSize; j++) {
+			//For each image find intensities of the neighbours
+			for (int k = -halfKernSize; k <= halfKernSize; k++) {
+				for (int l = -halfKernSize; l <= halfKernSize; l++) {
+					medKern.push_back(image.at<uchar>(i + k, j + l));
+					n++;
+				}
+			}
+			//find the median
+			sort(medKern.begin(), medKern.end());
+			float median = medKern[n / 2];
+			image2.at<uchar>(i, j) = saturate_cast<uchar>(median);
+			n = 0;
+			medKern.clear();
+		}
+	}
+
+	/*namedWindow("New image2", WINDOW_NORMAL);
 	resizeWindow("New image2", image2.rows * 2, image2.cols * 2);
 	imshow("New image2", image2);
-
+	*/
 	waitKey(0);
 	return image2;
 }
@@ -503,7 +395,7 @@ Mat RemoveLens(Mat image) {
 	vector<float> IMG;
 	vector<float> LENS;
 
-
+	//The images will be scaled according to the medians of the images
 
 	for (int i = 200; i < 300 ; i++) {
 		for (int j = 300; j < 400 ; j++) {
@@ -516,7 +408,7 @@ Mat RemoveLens(Mat image) {
 	sort(IMG.begin(), IMG.end());
 	sort(LENS.begin(), LENS.end());
 
-	//cout << i << "   " << rowV[n / 2] << endl;
+	
 	float MedIm = IMG[n / 2];
 	float MedL = LENS[n / 2];
 
@@ -538,3 +430,123 @@ Mat RemoveLens(Mat image) {
 	return image2;
 }
 
+
+//Removes Jupiter for reflection modelling
+Mat removeJup(Mat image) {
+	//blur the image from the beginning to remove unwanted noise and artifacts
+	GaussianBlur(image, image, Size(5, 5), 0);
+	int width = image.cols;
+	int height = image.rows;
+	Mat image2 = image.clone();
+	Mat image3 = image.clone();
+	imshow("im", image);
+	
+	int sum = 0;
+	//morphological watershed: set all values below a certain point to 0
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			if (image3.at<uchar>(i, j) < 43) { //27 fits for RightH, 32 fits for LeftH, 62 might fit LeftL
+				image3.at<uchar>(i, j) = 0;
+			}
+		}
+	}
+	
+	//Creation of different Gaussian filters
+	float sig3 = 0.5;
+	Mat GF3p5 = Mat::zeros(3, 3, CV_32F);
+	for (int x = -1; x <= 1;x++) {
+		for (int y = -1; y <= 1;y++) {
+			GF3p5.at<float>(x + 1, y + 1) = 1 / (2 * pi * sig3) * exp(-(pow(x,2) + pow(y,2)) / (2 * sig3));
+
+			cout << GF3p5.at<float>(x + 1, y + 1) << endl;
+		}
+	}
+	float sig5 = 1;
+	Mat GF5 = Mat::zeros(5, 5, CV_32F);
+	for (int x = -2; x <= 2;x++) {
+		for (int y = -2; y <= 2;y++) {
+			GF5.at<float>(x + 2, y + 2) = 1 / (2 * pi * sig5) * exp(-(pow(x, 2) + pow(y, 2)) / (2 * sig5));
+		}
+	}
+
+	float sig11 = 2.5;
+	Mat GF11 = Mat::zeros(11, 11, CV_32F);
+	for (int x = -5; x <= 5;x++) {
+		for (int y = -5; y <= 5;y++) {
+			GF11.at<float>(x + 5, y + 5) = 1 / (2 * pi * sig11) * exp(-(pow(x, 2) + pow(y, 2)) / (2 * sig11));
+		}
+	}
+	
+	//apply Gaussian filter to watershedded image
+	for (int i = 1; i < height - 1; i++) {
+		for (int j = 1; j < width - 1; j++) {
+			float sum = 0.0; 
+			for (int k = -1; k <= 1; k++) {
+				for (int l = -1; l <= 1; l++) {
+					int filterRow = k + 1; 
+					int filterCol = l + 1; 
+					sum += image3.at<uchar>(i + k, j + l) * GF3p5.at<float>(filterRow, filterCol);
+				}
+			}
+			// Clamp the result to [0, 255] and store in the output image
+			image3.at<uchar>(i, j) = cv::saturate_cast<uchar>(sum);
+		}
+	}
+
+	namedWindow("LP2", WINDOW_NORMAL);
+	resizeWindow("LP2", image2.rows * 2, image2.cols * 2);
+	imshow("LP2", image3);
+	waitKey();
+	
+	//Set upper limit for when to stop removing Jupiter and atmosphere
+	int lim = 141;
+	float blend_factor[141]; //41 for LeftL, 121 for RightH and mid, 101 for LeftL, 71 for mid
+	for (int i = 0; i < lim; i++) {
+		blend_factor[i] = static_cast<double>(i) / (lim - 1);
+	}
+	//For each pixel where Jupiter is detected replace pixel value with background estimate
+	//For the extended columns a blend factor is introduces to blend into the original image
+	for (int i = width-1; i > 0; i--){
+		//cout << i << endl;
+		for (int j = height-3; j > 0; j--) {
+			if (i < 752) {
+				//cout <<"J"<< j << endl;
+				image.at<uchar>(j, i) = rand() % 10 + 23;
+				if (image3.at<uchar>(j, i) == 0) {
+					if (j > lim+1)
+						for (int k = j - 1; k > j - lim; k--) {
+							//cout << k << endl;
+							image.at<uchar>(k, i) = (rand() % 10 + 23) * (1 - blend_factor[j - k - 1]) + image.at<uchar>(k, i) * (blend_factor[j - k - 1]); // 47 fits for LeftL, 15 fits for H, 25 for mid
+						}
+					break;
+				}
+			}
+		}
+	}
+
+	//Apply another filter to the finished image
+	for (int i = 5; i < height - 5; i++) {
+		for (int j = 5; j < width - 5; j++) {
+			float sum = 0.0; // Ensure sum is a float to handle the convolution properly
+			for (int k = -5; k <= 5; k++) {
+				for (int l = -5; l <= 5; l++) {
+					// Calculate filter indices correctly
+					int filterRow = k + 5; // Offset by 1 to map [-1, 0, 1] to [0, 1, 2]
+					int filterCol = l + 5; // Same offset logic
+					sum += image.at<uchar>(i + k, j + l) * GF11.at<float>(filterRow, filterCol);
+				}
+			}
+			// Clamp the result to [0, 255] and store in the output image
+			image.at<uchar>(i, j) = cv::saturate_cast<uchar>(sum);
+		}
+	}
+	
+
+
+	namedWindow("LP3", WINDOW_NORMAL);
+	resizeWindow("LP3", image2.rows * 2, image2.cols * 2);
+	imshow("LP3", image);
+	waitKey();
+
+	return image2;
+}
