@@ -57,7 +57,8 @@ Mat fourier(const Mat& OGImage) {
 	int vBorder = (desiredRows - rows) / 2;
 	int hBorder = (desiredCols - cols) / 2;
 	
-	
+
+	// Here the padding is performed
 	if (padding == "clamp") {
 		copyMakeBorder(OGImage, paddedImage, vBorder, vBorder, hBorder, hBorder, BORDER_REPLICATE); 
 	}
@@ -96,21 +97,17 @@ Mat fourier(const Mat& OGImage) {
 	
 	
 	// Now we will create the complex matrix which will contain the DFT output
-
+	
 	Mat real = Mat_<float>(paddedImage);
 	Mat imaginary = Mat::zeros(paddedImage.size(),CV_32F); 
 	// the output of the dft is a floating point value, so the two matrices are defined as float
 
 	Mat channels[] = { real, imaginary };
-
 	Mat complexImage; 
 	merge(channels, 2, complexImage);
 
-
 	// Doing the DFT !!! :-)
-	
 	dft(complexImage, complexImage, DFT_COMPLEX_OUTPUT);
-
 
 	// finding the magnitude as sqrt(R^2 + I^2) for each element in the complex output
 	split(complexImage, channels);
@@ -135,10 +132,7 @@ Mat fourier(const Mat& OGImage) {
 	minMaxLoc(mag, &minVal, &maxVal);
 	//cout << "min mag is: " << minVal << "  max mag is: " << maxVal << "\n";
 
-
 	// to make sure the coordinates (0,0) is at the centre of the image, the first quadrant is swapped with the third, an´d the second with the fourth
-
-
 	mag = mag(Rect(0, 0, mag.cols & -2, mag.rows & -2)); // reduces the magnitude image to an even number of columns and rows
 
 	int xCenter = mag.cols / 2;
@@ -150,14 +144,11 @@ Mat fourier(const Mat& OGImage) {
 		waitKey();
 	}
 
-
 	// now a graph of the x-axis is created so the oscilation frequency is more easily recognized
-
 	Mat xAxis = mag.row(yCenter).clone();  //deep copy
 	minMaxLoc(xAxis, &minVal, &maxVal);
 	xAxis = (xAxis / maxVal)*500; // Normalize and rescale to fit window
 
-	
 	if (analysis == 1){
 		int length = xAxis.cols;
 		Mat graph(500, length, CV_8UC3, Scalar(255, 255, 255));
@@ -185,20 +176,17 @@ Mat fourier(const Mat& OGImage) {
 	}
 	
 	
-	
 	// the central peak is taken out of the profile to remove the DC contribution
 	for (int i = 0; i < 40; i++) {				
 		xAxis.at<float>(0, xCenter + i) = 0;
 		xAxis.at<float>(0, xCenter - i) = 0;
 	}
-	
 	Point minLoc;
 	Point maxLoc;
 	minMaxLoc(xAxis, &minVal, &maxVal, &minLoc, &maxLoc); // the largest oscillation is located
 	
 	//cout << maxLoc.x << "\n";
 	int diff = xCenter - maxLoc.x;
-	
 	mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - 2, xCenter + diff + 2)) = 0; // target oscilation is set to 0 
 	mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 2, xCenter - diff + 2)) = 0; 
 
@@ -207,12 +195,10 @@ Mat fourier(const Mat& OGImage) {
 		waitKey();
 	}
 	
-	complexImage = swapQuadrants(complexImage); 
-	
 	// now we can filter out the target oscillation according to the mode selected
-	
+	complexImage = swapQuadrants(complexImage); 
 	if (mode == 0) {
-		if (manual == false) {
+		if (manual == false) { // Applying the filter to frequencies detected automatically
 			int diff = xCenter - maxLoc.x;
 			//complexImage(Range(yCenter, yCenter + yCenter), Range(xCenter + ndiff - 5, xCenter + ndiff + 5)) = 0; // target oscilation is set to 0 
 			//complexImage(Range(yCenter, yCenter + yCenter), Range(xCenter - ndiff - 5, xCenter - ndiff + 5)) = 0;  
@@ -220,10 +206,9 @@ Mat fourier(const Mat& OGImage) {
 			complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
 			mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - 5, xCenter + diff + 5)) = 0; // target oscilation is set to 0   
 			mag(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter - diff - 5, xCenter - diff + 5)) = 0; 
-		
 			complexImage = swapQuadrants(complexImage); 
 		}
-		else if (manual == true) {
+		else if (manual == true) { // Applying the filter to frequencies specified manually
 			for (int i = 0; i < fList.size(); i++) {
 				int diff = xCenter - fList[i];
 				complexImage(Range(yCenter - vInterval, yCenter + vInterval), Range(xCenter + diff - halfFilterWidth, xCenter + diff + halfFilterWidth)) = 0; // target oscilation is set to 0   
@@ -235,23 +220,20 @@ Mat fourier(const Mat& OGImage) {
 		}
 		imshow("filterd fourier image", mag);
 		waitKey();
-	
 	}
 	else if (mode == 1) {
 		float halfGaussFilter[halfFilterWidth]; 
-	
-	
-	
-		for (int i = 0;i < halfFilterWidth; i++) {
+		for (int i = 0;i < halfFilterWidth; i++) { // creating the gaussian filter
 			halfGaussFilter[i] = 1 - exp(-pow(i + 1, 2) / (2 * pow(cutoff, 2)));
 			// cout << halfGaussFilter[i] << "\n";
 		}
-	
 		split(complexImage, channels);
-		if (manual == false) {
+		if (manual == false) {  // Applying the filter to frequencies detected automatically
 			int diff = xCenter - maxLoc.x;
 			for (int i = 0; i <= vInterval; i++) {
 
+				
+				// changing the target frequencies in magnitude images
 				mag.at<float>(yCenter + i, xCenter + diff) = 0;
 				mag.at<float>(yCenter - i, xCenter + diff) = 0;
 				mag.at<float>(yCenter + i, xCenter - diff) = 0;
@@ -269,7 +251,7 @@ Mat fourier(const Mat& OGImage) {
 		
 				for (int j = 0; j < halfFilterWidth; j++) {
 
-					// applying gaussian to the complex image
+					//Applying Gaussian filter to the complex image
 					// first quadrant
 					channels[0].at<float>(yCenter - i, xCenter + diff + (j + 1)) *= halfGaussFilter[j];
 					channels[0].at<float>(yCenter - i, xCenter + diff - (j + 1)) *= halfGaussFilter[j];
@@ -321,7 +303,7 @@ Mat fourier(const Mat& OGImage) {
 				}
 			}
 		}
-		else if (manual == true) {
+		else if (manual == true) { // Applying the filter to frequencies specified manually
 			for (int k = 0; k < fList.size(); k++) {
 				int diff = xCenter - fList[k];
 		
@@ -401,26 +383,23 @@ Mat fourier(const Mat& OGImage) {
 		if (analysis == 1){
 			imshow("filterd fourier image", mag); 
 			waitKey();
-		}
-		
-	
+		}	
 	}
 
 	// at last we can convert back to the reconstructed image:
 
-	Mat recImage;
 	
 	idft(complexImage, complexImage, DFT_SCALE | DFT_REAL_OUTPUT); 
 	
 	minMaxLoc(complexImage, &minVal, &maxVal, &minLoc, &maxLoc);
 	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
-
-	//normalize(complexImage, recImage, OGmin, OGmax, NORM_MINMAX, CV_8U);
+	
+	Mat recImage;
 
 	int myCount0 = 0;
 	int myCount255 = 0;
 
-
+	// Counting the number of pixels being clipped
 	for (int i = 0; i < (cols + 2 * hBorder); i++) {
 		for (int j = 0; j < (rows + 2 * vBorder); j++) {
 			if (complexImage.at<float>(j, i) < 0) {
@@ -434,13 +413,11 @@ Mat fourier(const Mat& OGImage) {
 		}
 	}
 
-	complexImage.copyTo(recImage);
-	
-	
 	
 	cout << "myCount0: " << myCount0 << "  myCount255: " << myCount255 << "\n";
-	
-	
+	complexImage.copyTo(recImage);
+
+	// cutting off the patting
 	if (padding == "old version") {
 		recImage = recImage.colRange(0, cols);
 		recImage = recImage.rowRange(0, rows);
@@ -449,9 +426,8 @@ Mat fourier(const Mat& OGImage) {
 		recImage = recImage.colRange(hBorder, cols + hBorder);
 		recImage = recImage.rowRange(vBorder, rows + vBorder);
 	}
-	
-	
-	
+
+	// calculating the residuals
 	Mat Residuals;
 	Mat OGImage2;
 	OGImage.copyTo(OGImage2);
@@ -460,12 +436,11 @@ Mat fourier(const Mat& OGImage) {
 	Residuals = OGImage2 - recImage;
 	//Residuals = Residuals(Range(15, 400), Range(15, 400));
 	
-	
 	minMaxLoc(Residuals, &minVal, &maxVal, &minLoc, &maxLoc);
 	cout << "min val is: " << minVal << "  max val is: " << maxVal << "\n";
-	
 	Residuals = Residuals * (255 / maxVal);
-	
+
+	// saving the images
 	imwrite("Residuals_2f.png", Residuals);
 	
 	//imshow("Reconstructed Image (IDFT)", recImage);
